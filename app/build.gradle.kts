@@ -45,6 +45,9 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.ktx)
   implementation(libs.androidx.navigation.fragment.ktx)
   implementation(libs.androidx.navigation.ui.ktx)
+
+  //Material Design
+  implementation("com.google.android.material:material:1.9.0")
   
   // Retrofit for REST API calls
   implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -58,4 +61,10 @@ dependencies {
   testImplementation(libs.junit)
   androidTestImplementation(libs.androidx.junit)
   androidTestImplementation(libs.androidx.espresso.core)
+
+  // Testing dependencies
+  testImplementation("junit:junit:4.13.2")
+  testImplementation("androidx.arch.core:core-testing:2.2.0")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+  testImplementation("io.mockk:mockk:1.13.8")
 }

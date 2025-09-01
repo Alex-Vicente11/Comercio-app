@@ -63,8 +63,9 @@
       android:layout_height="wrap_content"
       android:id="@+id/fabAddProduct"
       android:layout_marginEnd="16dp"
-      android:layout_marginBottom="16dp"
+      android:layout_marginBottom="80dp"
       android:contentDescription="Agregar producto"
+      android:src="@android:drawable/ic_input_add"
       app:layout_constraintBottom_toBottomOf="parent"
       app:layout_constraintEnd_toEndOf="parent"/>
 
