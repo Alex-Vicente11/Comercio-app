@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.data.models.ProductRequest
+import com.oax.comercioapp.data.models.ProductResponse
 import com.oax.comercioapp.databinding.DialogAddProductBinding
 import com.oax.comercioapp.databinding.FragmentHomeBinding
 import com.oax.comercioapp.ui.adapters.ProductAdapter
@@ -34,8 +35,8 @@ class HomeFragment : Fragment() {
     val root: View = binding.root
 
     setupRecyclerView()
-    observeViewModel()
     setupClickListeners()
+    observeViewModel()
     
     return root
   }
@@ -81,6 +82,12 @@ class HomeFragment : Fragment() {
         }
       }
     }
+
+    // Observer para el resultado de crear producto
+    homeViewModel.createProductResult.observe(viewLifecycleOwner) { result ->
+      // Este observer se maneja globalmente para evitar multiples registros
+      handleCreateProductResult(result)
+    }
   }
 
   private fun setupClickListeners(){
@@ -89,65 +96,76 @@ class HomeFragment : Fragment() {
     }
   }
 
-  private fun showAddProductDialog(){
-    val dialogBinding = DialogAddProductBinding.inflate(layoutInflater)
+  private var currentDialog: AlertDialog?= null
+  private var currentDialogBinding: DialogAddProductBinding? = null
 
-    val dialog = AlertDialog.Builder(requireContext())
-        .setView(dialogBinding.root)
+  private fun showAddProductDialog(){
+    currentDialogBinding = DialogAddProductBinding.inflate(layoutInflater)
+
+    currentDialog = AlertDialog.Builder(requireContext())
+        .setView(currentDialogBinding!!.root)
         .setCancelable(false)
         .create()
 
-    dialogBinding.buttonCancel.setOnClickListener {
-      dialog.dismiss()
+    currentDialogBinding!!.buttonCancel.setOnClickListener {
+      currentDialog?.dismiss()
+      currentDialog = null
+      currentDialogBinding = null
     }
 
-    dialogBinding.buttonSave.setOnClickListener {
-      val productName = dialogBinding.editTextProductName.text.toString().trim()
-      val priceText = dialogBinding.editTextProductPrice.text.toString().trim()
+    currentDialogBinding!!.buttonSave.setOnClickListener {
+      val productName = currentDialogBinding!!.editTextProductName.text.toString().trim()
+      val priceText = currentDialogBinding!!.editTextProductPrice.text.toString().trim()
 
       if (validateInput(productName, priceText)){
         val price = priceText.toDouble()
         val productRequest = ProductRequest(productName, price)
 
         // Mostrar loading en el dialogo
-        dialogBinding.progressBarDialog.visibility = View.VISIBLE
-        dialogBinding.buttonSave.isEnabled = false
-        dialogBinding.buttonCancel.isEnabled = false
+        currentDialogBinding!!.progressBarDialog.visibility = View.VISIBLE
+        currentDialogBinding!!.buttonSave.isEnabled = false
+        currentDialogBinding!!.buttonCancel.isEnabled = false
 
         // Crear producto
         homeViewModel.createProduct(productRequest)
 
-        // Observar resultado de creacion
-        homeViewModel.createProductResult.observe(viewLifecycleOwner) { result ->
-          when (result) {
-            is NetworkResult.Success -> {
-              dialog.dismiss()
-              Toast.makeText(
-                    context,
-                    "Producto agregado exitosamente",
-                    Toast.LENGTH_SHORT
-              ).show()
-              homeViewModel.refreshProducts()
-            }
-            is NetworkResult.Error -> {
-                dialogBinding.progressBarDialog.visibility = View.GONE
-                dialogBinding.buttonSave.isEnabled = true
-                dialogBinding.buttonCancel.isEnabled = true
-              Toast.makeText(
-                  context,
-                  "Error: ${result.message}",
-                  Toast.LENGTH_LONG
-              ).show()
-            }
-            is NetworkResult.Loading -> {
-              // Ya manejado arriba
-            }
-          }
 
-        }
       }
     }
-    dialog.show()
+    currentDialog?.show()
+  }
+
+  private fun handleCreateProductResult(result: NetworkResult<ProductResponse>) {
+          when (result) {
+              is NetworkResult.Success -> {
+                  currentDialog?.dismiss()
+                  currentDialog = null
+                  currentDialogBinding = null
+                  Toast.makeText(
+                      context,
+                      "Producto agregado exitosamente",
+                      Toast.LENGTH_SHORT
+                  ).show()
+                  homeViewModel.refreshProducts()
+              }
+
+              is NetworkResult.Error -> {
+                  //Re-habilitar botones en caso de error
+                  currentDialogBinding?.let { binding ->
+                    binding.progressBarDialog.visibility = View.GONE
+                    binding.buttonSave.isEnabled = true
+                    binding.buttonCancel.isEnabled = true
+                  }
+                  Toast.makeText(
+                      context,
+                      "Error: ${result.message}",
+                      Toast.LENGTH_LONG
+                  ).show()
+              }
+              is NetworkResult.Loading -> {
+                  //Estado manejado en showAddProductDialog()
+              }
+          }
   }
 
   private fun validateInput(name: String, price: String): Boolean {
@@ -178,6 +196,9 @@ class HomeFragment : Fragment() {
 
   override fun onDestroyView() {
     super.onDestroyView()
+    currentDialog?.dismiss()
+    currentDialog = null
+    currentDialogBinding = null
     _binding = null
   }
 }
