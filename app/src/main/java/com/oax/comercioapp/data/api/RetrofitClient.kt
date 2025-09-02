@@ -11,7 +11,7 @@ object RetrofitClient {
     // Base URL for the Flask API running on localhost
     // For Android Emulator, use 10.0.2.2 instead of localhost
     // For physical device, use your computer's IP address
-    private const val BASE_URL = "http://10.0.2.2:5002/"
+    private const val BASE_URL = "http://192.168.68.146:5002/"
     
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
