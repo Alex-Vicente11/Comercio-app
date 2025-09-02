@@ -4,6 +4,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
 import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.data.models.Product
 import com.oax.comercioapp.data.models.ProductRequest
@@ -39,6 +40,7 @@ class HomeViewModel(private val productRepository: ProductRepository = ProductRe
   }
 
   fun createProduct(productRequest: ProductRequest){
+      android.util.Log.d("HomeViewModel", "Request: ${Gson().toJson(productRequest)}")
       viewModelScope.launch {
           productRepository.createProduct(productRequest).collect { result ->
               _createProductResult.postValue(result)
