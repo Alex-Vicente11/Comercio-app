@@ -122,7 +122,7 @@ class DashboardFragment : Fragment() {
         is NetworkResult.Success -> {
           Toast.makeText(
             requireContext(),
-            result.data.message,
+            "Usuario creado exitosamente",
             Toast.LENGTH_SHORT
           ).show()
           dashboardViewModel.clearCreateUserResult()
