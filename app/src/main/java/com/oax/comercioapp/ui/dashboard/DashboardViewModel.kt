@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.data.models.User
 import com.oax.comercioapp.data.models.UserRequest
+import com.oax.comercioapp.data.models.UserResponse
 import com.oax.comercioapp.data.repository.UserRepository
 import kotlinx.coroutines.launch
 
@@ -17,8 +18,8 @@ class DashboardViewModel : ViewModel() {
   private val _users = MutableLiveData<NetworkResult<List<User>>>()
   val users: LiveData<NetworkResult<List<User>>> = _users
 
-  private val _createUserResult = MutableLiveData<NetworkResult<String>>()
-  val createUserResult: LiveData<NetworkResult<String>> = _createUserResult
+  private val _createUserResult = MutableLiveData<NetworkResult<String>?>()
+  val createUserResult: LiveData<NetworkResult<String>?> = _createUserResult
   
   private val _text = MutableLiveData<String>().apply {
     value = "Usuarios"
