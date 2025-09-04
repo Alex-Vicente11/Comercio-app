@@ -9,27 +9,29 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.oax.comercioapp.R
 import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.databinding.FragmentDashboardBinding
 import com.oax.comercioapp.ui.adapters.UserAdapter
 
-class DashboardFragment : Fragment() {
+class ProfilesFragment : Fragment() {
 
   private var _binding: FragmentDashboardBinding? = null
   private val binding get() = _binding!!
   
   private lateinit var userAdapter: UserAdapter
-  private lateinit var dashboardViewModel: DashboardViewModel
+  private lateinit var profilesViewModel: ProfilesViewModel
 
   override fun onCreateView(
     inflater: LayoutInflater,
     container: ViewGroup?,
     savedInstanceState: Bundle?
   ): View {
-    dashboardViewModel = ViewModelProvider(this).get(DashboardViewModel::class.java)
+    profilesViewModel = ViewModelProvider(this).get(ProfilesViewModel::class.java)
 
-    _binding = FragmentDashboardBinding.inflate(inflater, container, false)
+    _binding = FragmentDashboardBinding.inflate(inflater)
     val root: View = binding.root
 
     setupRecyclerView()
@@ -46,6 +48,13 @@ class DashboardFragment : Fragment() {
         "Usuario seleccionado: ${user.userName}", 
         Toast.LENGTH_SHORT
       ).show()
+
+      val navController = findNavController()
+      navController.navigate(
+        R.id.action_navigation_profile_to_profileFragment,
+        args = Bundle().apply {
+          putString("profile_id", user.idUser.toString())
+        })
     }
     
     binding.recyclerViewUsers.apply {
@@ -73,7 +82,7 @@ class DashboardFragment : Fragment() {
       .setPositiveButton("Crear") { _, _ ->
         val userName = editText.text.toString()
         if (userName.isNotBlank()) {
-          dashboardViewModel.createUser(userName)
+          profilesViewModel.createUser(userName)
         }else {
           Toast.makeText(
             requireContext(),
@@ -87,11 +96,11 @@ class DashboardFragment : Fragment() {
   }
   
   private fun observeViewModel() {
-    dashboardViewModel.text.observe(viewLifecycleOwner) {
+    profilesViewModel.text.observe(viewLifecycleOwner) {
       binding.textDashboard.text = it
     }
-    
-    dashboardViewModel.users.observe(viewLifecycleOwner) { result ->
+
+    profilesViewModel.users.observe(viewLifecycleOwner) { result ->
       when (result) {
         is NetworkResult.Loading -> {
           binding.progressBar.visibility = View.VISIBLE
@@ -114,7 +123,7 @@ class DashboardFragment : Fragment() {
     }
 
     // Observer para el resultado de crear usuario
-    dashboardViewModel.createUserResult.observe(viewLifecycleOwner) { result ->
+    profilesViewModel.createUserResult.observe(viewLifecycleOwner) { result ->
       when (result) {
         is NetworkResult.Loading -> {
           // Se puede mostrar un ProgressDialog aqui
@@ -125,7 +134,7 @@ class DashboardFragment : Fragment() {
             "Usuario creado exitosamente",
             Toast.LENGTH_SHORT
           ).show()
-          dashboardViewModel.clearCreateUserResult()
+          profilesViewModel.clearCreateUserResult()
         }
         is NetworkResult.Error -> {
           Toast.makeText(
@@ -133,7 +142,7 @@ class DashboardFragment : Fragment() {
             "Error: ${result.message}",
             Toast.LENGTH_LONG
           ).show()
-          dashboardViewModel.clearCreateUserResult()
+          profilesViewModel.clearCreateUserResult()
         }
         null -> {
           // No hacer nada cuando es null

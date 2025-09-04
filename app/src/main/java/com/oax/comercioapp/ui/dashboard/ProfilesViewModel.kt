@@ -7,11 +7,10 @@ import androidx.lifecycle.viewModelScope
 import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.data.models.User
 import com.oax.comercioapp.data.models.UserRequest
-import com.oax.comercioapp.data.models.UserResponse
 import com.oax.comercioapp.data.repository.UserRepository
 import kotlinx.coroutines.launch
 
-class DashboardViewModel : ViewModel() {
+class ProfilesViewModel : ViewModel() {
 
   private val userRepository = UserRepository()
   

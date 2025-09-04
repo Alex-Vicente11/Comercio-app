@@ -12,14 +12,27 @@
       tools:layout="@layout/fragment_home" />
 
   <fragment
-      android:id="@+id/navigation_dashboard"
-      android:name="com.oax.comercioapp.ui.dashboard.DashboardFragment"
+      android:id="@+id/navigation_profiles"
+      android:name="com.oax.comercioapp.ui.dashboard.ProfilesFragment"
       android:label="@string/title_dashboard"
-      tools:layout="@layout/fragment_dashboard" />
+      tools:layout="@layout/fragment_dashboard" >
+    <action
+        android:id="@+id/action_navigation_profile_to_profileFragment"
+        app:destination="@id/profileFragment" />
+  </fragment>
 
   <fragment
       android:id="@+id/navigation_notifications"
       android:name="com.oax.comercioapp.ui.notifications.NotificationsFragment"
       android:label="@string/title_notifications"
       tools:layout="@layout/fragment_notifications" />
+  <fragment
+      android:id="@+id/profileFragment"
+      android:name="com.oax.comercioapp.ui.profile.ProfileFragment"
+      android:label="Profile"
+      tools:layout="@layout/fragment_profile">
+    <argument
+        android:name="profile_id"
+        app:argType="string" />
+  </fragment>
 </navigation>

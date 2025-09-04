@@ -57,7 +57,9 @@ dependencies {
   // Coroutines for async operations
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-  
+  implementation(libs.androidx.legacy.support.v4)
+  implementation(libs.androidx.fragment.ktx)
+
   testImplementation(libs.junit)
   androidTestImplementation(libs.androidx.junit)
   androidTestImplementation(libs.androidx.espresso.core)
