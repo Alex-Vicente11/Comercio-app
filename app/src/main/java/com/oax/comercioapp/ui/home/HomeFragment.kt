@@ -14,6 +14,7 @@ import com.oax.comercioapp.data.models.ProductRequest
 import com.oax.comercioapp.databinding.DialogAddProductBinding
 import com.oax.comercioapp.databinding.FragmentHomeBinding
 import com.oax.comercioapp.ui.adapters.ProductAdapter
+import com.oax.comercioapp.utils.SessionManager
 
 class HomeFragment : Fragment() {
 
@@ -34,19 +35,48 @@ class HomeFragment : Fragment() {
     val root: View = binding.root
 
     setupRecyclerView()
+    setupSessionObserver()
     observeViewModel()
     setupClickListeners()
     
     return root
   }
-  
+
+
+  private fun setupSessionObserver() {
+    SessionManager.currentUser.observe(viewLifecycleOwner) { user ->
+      updateHomeTitle(user?.userName)
+    }
+  }
+
+  private fun updateHomeTitle(userName: String?) {
+    val baseTitle = "Productos"
+    if (userName != null) {
+      binding.textHome.text = "$baseTitle\n Sesión: $userName"
+    }else {
+      binding.textHome.text = "$baseTitle\n Inicia sesión seleccionando un usuario"
+    }
+  }
+
   private fun setupRecyclerView() {
     productAdapter = ProductAdapter { product ->
-      Toast.makeText(
-        context, 
-        "Producto seleccionado: ${product.product}", 
-        Toast.LENGTH_SHORT
-      ).show()
+
+      val currentUser = SessionManager.getCurrentUser()
+      if (currentUser != null) {
+        Toast.makeText(
+          context,
+          "${currentUser.userName} Seleccionó: ${product.product} - $${product.price}",
+          Toast.LENGTH_SHORT
+        ).show()
+
+      }else {
+        Toast.makeText(
+          context,
+          "Debes iniciar sesión primero.\nVe a 'Usuarios' y selecciona un perfil",
+          Toast.LENGTH_LONG
+        ).show()
+
+      }
     }
     
     binding.recyclerViewProducts.apply {
@@ -56,8 +86,10 @@ class HomeFragment : Fragment() {
   }
   
   private fun observeViewModel() {
-    homeViewModel.text.observe(viewLifecycleOwner) {
-      binding.textHome.text = it
+    homeViewModel.text.observe(viewLifecycleOwner) { vmText ->
+      if (!SessionManager.isLoggedIn()) {
+        binding.textHome.text = "$vmText\n Inicia sesión seleccionando un usuario"
+      }
     }
     
     homeViewModel.products.observe(viewLifecycleOwner) { result ->
