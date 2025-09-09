@@ -9,6 +9,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.google.android.gms.cast.framework.SessionManager
 import com.oax.comercioapp.data.api.NetworkResult
+import com.oax.comercioapp.data.models.User
 import com.oax.comercioapp.databinding.FragmentProfileBinding
 import java.lang.NumberFormatException
 
@@ -51,17 +52,8 @@ class ProfileFragment : Fragment() {
           binding.profileId.text = "Cargando usuario..."
         }
         is NetworkResult.Success -> {
-          val user = result.data
-          binding.profileId.text = "Perfil de: ${user.userName}\nID: ${user.idUser}"
 
-          SessionManager.login(user)
-          viewModel.setCurrentUser(user)
-
-          Toast.makeText(
-            requireContext(),
-            "¡Sesión iniciada para: ${user.userName}!\nTodos los fragments fueron actualizados",
-            Toast.LENGTH_LONG
-          ).show()
+          viewModel.setCurrentUser(result.data)
         }
         is NetworkResult.Error -> {
           binding.profileId.text = "Error: ${result.message}\nID recibido: $profileId"
@@ -70,9 +62,21 @@ class ProfileFragment : Fragment() {
     }
 
     viewModel.currentUser.observe(viewLifecycleOwner) { user ->
-      user?.let {
-        // Aqui se puede actualizar la UI adicional para mostrar sesión activa
-      }
+      updateUserUI(user)
+
+    }
+  }
+
+  private fun updateUserUI(user: User?) {
+    user?.let {
+      binding.profileId.text = "Perfil de:${it.userName}\nID: ${it.idUser}"
+      Toast.makeText(
+        requireContext(),
+        "¡Sesión iniciada para: ${it.userName}",
+        Toast.LENGTH_LONG
+      ).show()
+    }?: run {
+      binding.profileId.text = "No hay sesión activa"
     }
   }
 

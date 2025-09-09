@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.data.models.User
 import com.oax.comercioapp.data.repository.UserRepository
+import com.oax.comercioapp.utils.SessionManager
 import kotlinx.coroutines.launch
 
 class ProfileViewModel : ViewModel() {
@@ -15,12 +16,13 @@ class ProfileViewModel : ViewModel() {
     private val _user = MutableLiveData<NetworkResult<User>>()
     val user: LiveData<NetworkResult<User>> = _user
 
-    private val _currentUser = MutableLiveData<User?>()
-    val currentUser: LiveData<User?> = _currentUser
+    val currentUser: LiveData<User?> = SessionManager.currentUser
+    val sessionStatus: LiveData<String> = SessionManager.sessionStatus
 
 
     fun loadUser(userId: Int) {
         viewModelScope.launch {
+            _user.postValue(NetworkResult.Loading())
             userRepository.getUserById(userId).collect { result ->
                 _user.postValue(result)
             }
@@ -28,24 +30,21 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun setCurrentUser(user: User) {
-        _currentUser.postValue(user)
 
-        com.oax.comercioapp.utils.SessionManager.login(user)
+        SessionManager.login(user)
 
         //Para guardar en SharedPreferences para persistir la sesion
         //E iniciliciar datos especificos del usuario (carrito, preferencias, etc)
     }
 
     fun getCurrentUser(): User? {
-        return _currentUser.value
+        return SessionManager.getCurrentUser()
     }
 
-    fun isUserLoggedIn(): Boolean {
-        return _currentUser.value != null
-    }
+    fun isUserLoggedIn(): Boolean = SessionManager.isLoggedIn()
 
     fun logout() {
-        _currentUser.postValue(null)
+        SessionManager.logout()
 
         // Para limpiar SharedPreferences
         // Limpiar cache de datos del usuario
@@ -53,13 +52,13 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun refreshCurrentUser() {
-        _currentUser.value?.let { user ->
+        SessionManager.getCurrentUser()?.let { user ->
             loadUser(user.idUser)
         }
     }
 
     fun getCurrentUserInfo(): Pair<Int, String>? {
-        return _currentUser.value?.let { user ->
+        return SessionManager.getCurrentUser()?.let { user ->
             Pair(user.idUser, user.userName)
         }
     }
