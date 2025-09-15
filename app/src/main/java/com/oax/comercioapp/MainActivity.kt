@@ -8,6 +8,8 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.oax.comercioapp.databinding.ActivityMainBinding
+import com.oax.comercioapp.utils.PreferencesManager
+import com.oax.comercioapp.utils.SessionManager
 
 class MainActivity : AppCompatActivity() {
 
@@ -16,9 +18,32 @@ class MainActivity : AppCompatActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
+    // Inicializar sistemas de persistencia
+    initializePersistenceSystems()
+
     binding = ActivityMainBinding.inflate(layoutInflater)
     setContentView(binding.root)
 
+    setupNavigation()
+
+  }
+
+  // Inicializar PreferencesManager y SessionManager
+  private fun initializePersistenceSystems() {
+    // Inicializar PreferencesManager con el contexto
+    PreferencesManager.init(this)
+    println("MainActivity: PreferencesManager inicializado")
+
+    // Inicializar SessionManager (esto restaurara la sesion si existe)
+    SessionManager.initialize()
+    println("MainActivity: SessionManager inicializado")
+
+    // Debug info (opcional - se comenta para produccion)
+    println("=== INFORMACION DE INICIO ===")
+    println(SessionManager.debugCurrentSession())
+  }
+
+  private fun setupNavigation() {
     val navView: BottomNavigationView = binding.navView
 
     val navController = findNavController(R.id.nav_host_fragment_activity_main)
@@ -32,9 +57,27 @@ class MainActivity : AppCompatActivity() {
     setupActionBarWithNavController(navController, appBarConfiguration)
     navView.setupWithNavController(navController)
   }
-  
+
   override fun onSupportNavigateUp(): Boolean {
     val navController = findNavController(R.id.nav_host_fragment_activity_main)
     return navController.navigateUp() || super.onSupportNavigateUp()
+  }
+
+  // METODOS PARA DEBUGGING (opcional)
+  override fun onResume() {
+    super.onResume()
+    // Log del estado actual de la sesion cuando vuelve la app
+    println("MainActivity: App resumed - ${SessionManager.debugCurrentSession()}")
+  }
+
+  override fun onPause() {
+    super.onPause()
+    // Log cuando la app pasa a background
+    println("MainActivity: App paused - Usuario actual: ${SessionManager.getCurrentUserName()}")
+  }
+
+  // Metodo para debugging - para llamarlo desde cualquier fragment
+  fun printSessionDebugInfo() {
+    println(SessionManager.getCompleteSessionInfo())
   }
 }
