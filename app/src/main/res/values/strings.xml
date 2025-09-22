@@ -1,6 +1,10 @@
 <resources>
   <string name="app_name">ComercioApp</string>
   <string name="title_home">Home</string>
-  <string name="title_dashboard">Dashboard</string>
+  <string name="title_dashboard">Users</string>
   <string name="title_notifications">Notifications</string>
+  <string name="add_to_cart_text">Agregar a carrito</string>
+  <string name="decreaseQuantityText">-</string>
+  <string name="increaseQuantityText">+</string>
+  <string name="item_quantity_test">10</string>
 </resources>
