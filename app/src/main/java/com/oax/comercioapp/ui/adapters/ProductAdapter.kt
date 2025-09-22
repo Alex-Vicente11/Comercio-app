@@ -8,8 +8,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.oax.comercioapp.data.models.Product
 import com.oax.comercioapp.databinding.ItemProductBinding
 
+interface ProductEvents {
+    fun increaseQuantity(product: Product, quantity: Int)
+    fun decreaseQuantity(product: Product, quantity: Int)
+}
+
 class ProductAdapter(
-    private val onProductClick: (Product) -> Unit = {}
+    private val onProductEvent: ProductEvents
 ) : ListAdapter<Product, ProductAdapter.ProductViewHolder>(ProductDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ProductViewHolder {
@@ -32,9 +37,33 @@ class ProductAdapter(
         fun bind(product: Product) {
             binding.textProductName.text = product.product
             binding.textProductPrice.text = "$${"%.2f".format(product.price)}"
-            
-            binding.root.setOnClickListener {
-                onProductClick(product)
+
+            binding.addToCartButton.increaseQuantity.setOnClickListener {
+                onProductEvent.increaseQuantity(
+                    product,
+                    getNextQuantity()
+                )
+            }
+
+            binding.addToCartButton.decreaseQuantity.setOnClickListener {
+                onProductEvent.decreaseQuantity(
+                    product,
+                    getPreviousQuantity()
+                )
+            }
+        }
+
+        private fun getNextQuantity() =
+            (Integer.getInteger(binding.addToCartButton.quantityAdded.text.toString()) ?: 0) + 1
+
+        private fun getPreviousQuantity(): Int {
+            val result =
+                (Integer.getInteger(binding.addToCartButton.quantityAdded.text.toString()) ?: 0) - 1
+
+            return if (result < 0) {
+                0
+            } else {
+                result
             }
         }
     }

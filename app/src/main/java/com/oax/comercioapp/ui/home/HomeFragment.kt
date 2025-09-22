@@ -1,6 +1,7 @@
 package com.oax.comercioapp.ui.home
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,10 +11,12 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.oax.comercioapp.data.api.NetworkResult
+import com.oax.comercioapp.data.models.Product
 import com.oax.comercioapp.data.models.ProductRequest
 import com.oax.comercioapp.databinding.DialogAddProductBinding
 import com.oax.comercioapp.databinding.FragmentHomeBinding
 import com.oax.comercioapp.ui.adapters.ProductAdapter
+import com.oax.comercioapp.ui.adapters.ProductEvents
 import com.oax.comercioapp.utils.SessionManager
 
 class HomeFragment : Fragment() {
@@ -59,25 +62,17 @@ class HomeFragment : Fragment() {
   }
 
   private fun setupRecyclerView() {
-    productAdapter = ProductAdapter { product ->
-
-      val currentUser = SessionManager.getCurrentUser()
-      if (currentUser != null) {
-        Toast.makeText(
-          context,
-          "${currentUser.userName} Seleccionó: ${product.product} - $${product.price}",
-          Toast.LENGTH_SHORT
-        ).show()
-
-      }else {
-        Toast.makeText(
-          context,
-          "Debes iniciar sesión primero.\nVe a 'Usuarios' y selecciona un perfil",
-          Toast.LENGTH_LONG
-        ).show()
-
+    productAdapter = ProductAdapter(object : ProductEvents {
+      override fun increaseQuantity(product: Product, quantity: Int) {
+        Log.i("DEBUG", "${product}  -> quantity ${quantity}")
+        val currentUser = SessionManager.getCurrentUser()
       }
-    }
+
+      override fun decreaseQuantity(product: Product, quantity: Int) {
+        TODO("Not yet implemented")
+      }
+
+    })
     
     binding.recyclerViewProducts.apply {
       layoutManager = LinearLayoutManager(context)
