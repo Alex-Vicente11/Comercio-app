@@ -38,33 +38,45 @@ class ProductAdapter(
             binding.textProductName.text = product.product
             binding.textProductPrice.text = "$${"%.2f".format(product.price)}"
 
+            // Inicializar la cantidad si no esta establecida
+            if (binding.addToCartButton.quantityAdded.text.toString().isEmpty()) {
+                binding.addToCartButton.quantityAdded.text = "0"
+            }
+
             binding.addToCartButton.increaseQuantity.setOnClickListener {
-                onProductEvent.increaseQuantity(
-                    product,
-                    getNextQuantity()
-                )
+                val newQuantity = getNextQuantity()
+                binding.addToCartButton.quantityAdded.text = newQuantity.toString()
+                onProductEvent.increaseQuantity(product, newQuantity)
             }
 
             binding.addToCartButton.decreaseQuantity.setOnClickListener {
-                onProductEvent.decreaseQuantity(
-                    product,
-                    getPreviousQuantity()
-                )
+                val newQuantity = getPreviousQuantity()
+                binding.addToCartButton.quantityAdded.text = newQuantity.toString()
+                onProductEvent.decreaseQuantity(product, newQuantity)
             }
         }
 
-        private fun getNextQuantity() =
-            (Integer.getInteger(binding.addToCartButton.quantityAdded.text.toString()) ?: 0) + 1
+        private fun getNextQuantity(): Int {
+            val currentText = binding.addToCartButton.quantityAdded.text.toString()
+            val currentQuantity = try {
+                currentText.toInt()
+            } catch (e: NumberFormatException) {
+                0
+            }
+            return currentQuantity + 1
+        }
+
 
         private fun getPreviousQuantity(): Int {
-            val result =
-                (Integer.getInteger(binding.addToCartButton.quantityAdded.text.toString()) ?: 0) - 1
-
-            return if (result < 0) {
+            val currentText = binding.addToCartButton.quantityAdded.text.toString()
+            val currentQuantity = try {
+                currentText.toInt()
+            } catch (e: java.lang.NumberFormatException) {
                 0
-            } else {
-                result
             }
+
+            val result = currentQuantity - 1
+            return if (result < 0 ) 0 else result
         }
     }
 

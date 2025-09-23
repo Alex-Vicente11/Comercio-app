@@ -43,4 +43,27 @@ interface ApiService {
     
     @DELETE("products/{id}")
     suspend fun deleteProduct(@Path("id") id: Int): Response<ProductResponse>
+
+    // Cart endpoints
+
+    @GET("cart/user/{userId}")
+    suspend fun getCartItems(@Path("userId") userId: Int): Response<List<CartItem>>
+
+    @GET("cart/{userId}/{productId}")
+    suspend fun getCartItem(
+        @Path("userId") userId: Int,
+        @Path("productId") productId: Int
+    ): Response<Cart?>
+
+    @POST("cart")
+    suspend fun addToCart(@Body request: CartRequest): Response<CartResponse>
+
+    @PUT("cart/{id}")
+    suspend fun updateCartItem(
+        @Path("id") cartId: Int,
+        @Body request: CartUpdateRequest
+    ): Response<CartResponse>
+
+    @DELETE("cart/{id}")
+    suspend fun removeFromCart(@Path("id") cartId: Int): Response<CartResponse>
 }

@@ -26,6 +26,7 @@ class HomeFragment : Fragment() {
   
   private lateinit var productAdapter: ProductAdapter
   private lateinit var homeViewModel: HomeViewModel
+  private lateinit var cartViewModel: CartViewModel
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -33,6 +34,7 @@ class HomeFragment : Fragment() {
     savedInstanceState: Bundle?
   ): View {
     homeViewModel = ViewModelProvider(this).get(HomeViewModel::class.java)
+    cartViewModel = ViewModelProvider(this).get(CartViewModel::class.java)
 
     _binding = FragmentHomeBinding.inflate(inflater, container, false)
     val root: View = binding.root
@@ -40,6 +42,7 @@ class HomeFragment : Fragment() {
     setupRecyclerView()
     setupSessionObserver()
     observeViewModel()
+    observeCartViewModel()
     setupClickListeners()
     
     return root
@@ -66,10 +69,21 @@ class HomeFragment : Fragment() {
       override fun increaseQuantity(product: Product, quantity: Int) {
         Log.i("DEBUG", "${product}  -> quantity ${quantity}")
         val currentUser = SessionManager.getCurrentUser()
+        if (currentUser != null) {
+          cartViewModel.handleIncreaseQuantity(currentUser.idUser, product, quantity)
+        } else {
+          Toast.makeText(context, "Inicia sesión para agregar productos al carrito", Toast.LENGTH_SHORT).show()
+        }
       }
 
       override fun decreaseQuantity(product: Product, quantity: Int) {
-        TODO("Not yet implemented")
+        Log.i("DEBUG", "${product} -> decreasing to quantity ${quantity}")
+        val currentUser = SessionManager.getCurrentUser()
+        if (currentUser != null) {
+          cartViewModel.handleDecreaseQuantity(currentUser.idUser, product, quantity)
+        } else {
+          Toast.makeText(context, "Inicia sesión para modificar el carrito", Toast.LENGTH_SHORT).show()
+        }
       }
 
     })
@@ -110,6 +124,50 @@ class HomeFragment : Fragment() {
     }
   }
 
+
+  private fun observeCartViewModel() {
+    cartViewModel.addToCartResult.observe(viewLifecycleOwner) { result ->
+      when (result) {
+        is NetworkResult.Success -> {
+          Toast.makeText(context, "Producto agregado al carrito", Toast.LENGTH_SHORT).show()
+        }
+        is NetworkResult.Error -> {
+          Toast.makeText(context, "Error al agregar al carrito: ${result.message}", Toast.LENGTH_SHORT).show()
+        }
+        is NetworkResult.Loading -> {
+          // Opcional: motrar loading
+        }
+      }
+    }
+
+    cartViewModel.updateCartResult.observe(viewLifecycleOwner) { result ->
+      when (result) {
+        is NetworkResult.Success -> {
+          Toast.makeText(context, "Carrito actualizado", Toast.LENGTH_SHORT).show()
+        }
+        is NetworkResult.Error -> {
+          Toast.makeText(context, "Error al actualizar carrito: ${result.message}", Toast.LENGTH_SHORT).show()
+        }
+        is NetworkResult.Loading -> {
+          // Loading state
+        }
+      }
+    }
+
+    cartViewModel.removeFromCartResult.observe(viewLifecycleOwner) { result ->
+      when (result) {
+        is NetworkResult.Success -> {
+          Toast.makeText(context, "Producto eliminado del carrito", Toast.LENGTH_SHORT).show()
+        }
+        is NetworkResult.Error -> {
+          Toast.makeText(context, "Error al eliminar del carrito: ${result.message}", Toast.LENGTH_SHORT).show()
+        }
+        is NetworkResult.Loading -> {
+          // Loading state
+        }
+      }
+    }
+  }
   private fun setupClickListeners(){
     binding.fabAddProduct.setOnClickListener {
       showAddProductDialog()
