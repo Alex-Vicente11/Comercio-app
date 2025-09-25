@@ -55,7 +55,7 @@ interface ApiService {
         @Path("productId") productId: Int
     ): Response<Cart?>
 
-    @POST("cart")
+    @POST("add-to-cart")
     suspend fun addToCart(@Body request: CartRequest): Response<CartResponse>
 
     @PUT("cart/{id}")
