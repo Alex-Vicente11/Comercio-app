@@ -51,7 +51,12 @@ class HomeFragment : Fragment() {
 
   private fun setupSessionObserver() {
     SessionManager.currentUser.observe(viewLifecycleOwner) { user ->
+      Log.d("HomeFragment", "Session changed: ${user?.userName}")
       updateHomeTitle(user?.userName)
+
+      /*user?.let {
+        cartViewModel.loadCartItems(it.idUser)
+      }*/
     }
   }
 
@@ -259,7 +264,14 @@ class HomeFragment : Fragment() {
     return true
   }
 
+  override fun onResume() {
+    super.onResume()
 
+    //
+    val currentUser = SessionManager.getCurrentUser()
+    updateHomeTitle(currentUser?.userName)
+    Log.d("HomeFragment", "onResume - Current user: ${currentUser?.userName}")
+  }
 
   override fun onDestroyView() {
     super.onDestroyView()

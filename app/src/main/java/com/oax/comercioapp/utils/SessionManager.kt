@@ -89,6 +89,8 @@ object SessionManager {
             _currentUser.postValue(user)
             updateSessionStatus(user)
 
+            println("$TAG: LiveData updated - Current observers: ${_currentUser.hasObservers()}") //log para seguimiento de session
+
             // Persistir solo si PreferencesManager está disponible
             try {
                 PreferencesManager.saveUserSession(user.idUser, user.userName)

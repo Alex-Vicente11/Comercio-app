@@ -1,6 +1,7 @@
 package com.oax.comercioapp.ui.profile
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -102,11 +103,17 @@ class ProfileFragment : Fragment() {
       .setTitle("Cambiar Usuario")
       .setMessage("¿Quieres volver a la lista de usuarios para seleccionar otro?")
       .setPositiveButton("Sí") { _, _ ->
-        // Navegar a ProfilesFragment sin cerrar sesion
+        val currentUserName = com.oax.comercioapp.utils.SessionManager.getCurrentUserName()
+
+        // Hacer logout completo antes de navegar
+        com.oax.comercioapp.utils.SessionManager.logout()
+
+        // Navegar a la lista de usuarios
         navigateToUsersList()
+
         Toast.makeText(
           requireContext(),
-          "Selecciona otro usuario de la lista",
+          "Sesión cerrada para: $currentUserName. Selecciona otro usuario",
           Toast.LENGTH_SHORT
         ).show()
       }
@@ -165,6 +172,7 @@ class ProfileFragment : Fragment() {
     user?.let {
       binding.profileId.text = "Perfil de:${it.userName}\nID: ${it.idUser}"
 
+      Log.d("ProfileFragment", "Setting user session: ${it.userName}")
       // Actualizar informacion de sesion
       binding.sessionInfo.text = "¡Sesión Activa!\n\n" +
               "Usuario: ${it.userName}\n" +
