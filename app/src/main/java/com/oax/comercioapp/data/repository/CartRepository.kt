@@ -21,6 +21,8 @@ class CartRepository {
             val response = apiService.getCartItems(userId)
             if (response.isSuccessful && response.body() != null) {
                 emit(NetworkResult.Success(response.body()!!))
+            } else if(response.code() == 404) {
+                emit(NetworkResult.Success(emptyList<CartItem>()))
             } else {
                 emit(NetworkResult.Error(response.message()))
             }
