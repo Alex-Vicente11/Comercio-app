@@ -16,6 +16,9 @@ import com.oax.comercioapp.data.models.User
 import com.oax.comercioapp.databinding.FragmentProfileBinding
 import java.lang.NumberFormatException
 import com.oax.comercioapp.R
+import com.oax.comercioapp.data.models.CartItem
+import com.oax.comercioapp.ui.home.CartViewModel
+import com.oax.comercioapp.utils.SessionManager.currentUser
 
 class ProfileFragment : Fragment() {
 
@@ -27,6 +30,8 @@ class ProfileFragment : Fragment() {
   private lateinit var binding: FragmentProfileBinding
 
   private val viewModel: ProfileViewModel by viewModels()
+
+  private val cartViewModel: CartViewModel by viewModels()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -82,6 +87,50 @@ class ProfileFragment : Fragment() {
         binding.profileId.text = "Restaurando sesión..."
         setButtonsEnabled(false)
       }
+    }
+
+    cartViewModel.cartItems.observe(viewLifecycleOwner) { result ->
+      when (result) {
+        is NetworkResult.Loading -> {
+          updateCartInfo("Cargando carrito...")
+        }
+        is NetworkResult.Success -> {
+          val cartInfo = formatCartItems(result.data)
+          updateCartInfo(cartInfo)
+        }
+        is NetworkResult.Error -> {
+          updateCartInfo("Error al cargar carrito: ${result.message}")
+        }
+      }
+    }
+  }
+
+  private fun formatCartItems(cartItems: List<CartItem>): String { //carItems = result
+    if (cartItems.isEmpty()) {
+      return "Carrito vacío\n\nVe a 'Productos' para agregar productos a tu carrito"
+    }
+
+    val itemsText = cartItems.joinToString("\n") { item ->
+      ". ${item.product.product} - Cantidad: ${item.quantity} - $${String.format("%.2f", item.product.price * item.quantity)}"
+    }
+
+    val total = cartItems.sumOf { it.product.price * it.quantity }
+
+    return "Productos en carrito (${cartItems.size}):\n$itemsText\n\nTotal: $${String.format("%.2f", total)}"
+
+  }
+
+  private fun updateCartInfo(cartInfo: String) {
+    val currentUser = com.oax.comercioapp.utils.SessionManager.getCurrentUser()
+    currentUser?.let { user ->
+      binding.sessionInfo.text = "¡Sesión Activa!\n\n" +
+              "Usuario : ${user.userName}\n" +
+              "ID: ${user.idUser}\n\n" +
+              "$cartInfo\n\n" +
+              "Funcionalidades disponibles:\n" +
+              ". Carrito personalizado\n" +
+              ". Historial de pedidos\n" +
+              ". Preferencias guardadas"
     }
   }
 
@@ -169,22 +218,19 @@ class ProfileFragment : Fragment() {
   }
 
   private fun updateUserUI(user: User?) {
-    user?.let {
-      binding.profileId.text = "Perfil de:${it.userName}\nID: ${it.idUser}"
+    user?.let { currentUser ->
+      binding.profileId.text = "Perfil de:${currentUser.userName}\nID: ${currentUser.idUser}"
 
-      Log.d("ProfileFragment", "Setting user session: ${it.userName}")
-      // Actualizar informacion de sesion
-      binding.sessionInfo.text = "¡Sesión Activa!\n\n" +
-              "Usuario: ${it.userName}\n" +
-              "ID: ${it.idUser}\n\n" +
-              "Funcionalidades disponibles:\n" +
-              ". Carrito personalizado\n" +
-              ". Historial de pedidos\n" +
-              ". Preferencias guardadas"
+      Log.d("ProfileFragment", "Setting user session: ${currentUser.userName}")
+
+      // Cargar items del carrito
+      cartViewModel.loadCartItems(currentUser.idUser)
+
+      binding.sessionInfo.text = buildSessionInfo(currentUser)
 
       Toast.makeText(
         requireContext(),
-        "¡Sesión iniciada para: ${it.userName}",
+        "¡Sesión iniciada para: ${currentUser.userName}",
         Toast.LENGTH_LONG
       ).show()
     }?: run {
@@ -192,6 +238,14 @@ class ProfileFragment : Fragment() {
       binding.sessionInfo.text = "No hay usuario logueado\n\n" +
               "Selecciona un usuario de la lista para iniciar sesión"
     }
+  }
+
+  private fun buildSessionInfo(user: User): String {
+    return "¡Sesión Activa!\n\n" +
+            "Usuario: ${user.userName}\n" +
+            "ID: ${user.idUser}\n\n" +
+            "Carrito de compras:\n" +
+            "Cargando productos..."  // se actualiza con Observer
   }
 
   private fun updateSessionButtons() {
