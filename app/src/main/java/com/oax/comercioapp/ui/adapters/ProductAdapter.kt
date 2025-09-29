@@ -14,7 +14,8 @@ interface ProductEvents {
 }
 
 class ProductAdapter(
-    private val onProductEvent: ProductEvents
+    private val onProductEvent: ProductEvents,
+    private val getCurrentCartQuantity: (Product) -> Int = {0} // Nueva funcion callback
 ) : ListAdapter<Product, ProductAdapter.ProductViewHolder>(ProductDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ProductViewHolder {
@@ -38,47 +39,27 @@ class ProductAdapter(
             binding.textProductName.text = product.product
             binding.textProductPrice.text = "$${"%.2f".format(product.price)}"
 
-            // Inicializar la cantidad si no esta establecida
-            if (binding.addToCartButton.quantityAdded.text.toString().isEmpty()) {
-                binding.addToCartButton.quantityAdded.text = "0"
-            }
+            // Actualizar el TextView cada vez que se hace bind
+            val currentQuantity = getCurrentCartQuantity(product)
+            binding.addToCartButton.quantityAdded.text = currentQuantity.toString()
 
             binding.addToCartButton.increaseQuantity.setOnClickListener {
-                val newQuantity = getNextQuantity()
-                binding.addToCartButton.quantityAdded.text = newQuantity.toString()
-                onProductEvent.increaseQuantity(product, newQuantity)
+                // Obtener cantidad freca cada vez
+                val qty = getCurrentCartQuantity(product)
+                binding.addToCartButton.quantityAdded.text = (qty + 1).toString()
+                onProductEvent.increaseQuantity(product, qty + 1)
             }
 
             binding.addToCartButton.decreaseQuantity.setOnClickListener {
-                val newQuantity = getPreviousQuantity()
-                binding.addToCartButton.quantityAdded.text = newQuantity.toString()
-                onProductEvent.decreaseQuantity(product, newQuantity)
+                val qty = getCurrentCartQuantity(product)
+                val newQty = maxOf(0, qty - 1)
+                binding.addToCartButton.quantityAdded.text = newQty.toString()
+                onProductEvent.decreaseQuantity(product, newQty)
             }
         }
 
-        private fun getNextQuantity(): Int {
-            val currentText = binding.addToCartButton.quantityAdded.text.toString()
-            val currentQuantity = try {
-                currentText.toInt()
-            } catch (e: NumberFormatException) {
-                0
-            }
-            return currentQuantity + 1
-        }
-
-
-        private fun getPreviousQuantity(): Int {
-            val currentText = binding.addToCartButton.quantityAdded.text.toString()
-            val currentQuantity = try {
-                currentText.toInt()
-            } catch (e: java.lang.NumberFormatException) {
-                0
-            }
-
-            val result = currentQuantity - 1
-            return if (result < 0 ) 0 else result
-        }
     }
+
 
     class ProductDiffCallback : DiffUtil.ItemCallback<Product>() {
         override fun areItemsTheSame(oldItem: Product, newItem: Product): Boolean {
