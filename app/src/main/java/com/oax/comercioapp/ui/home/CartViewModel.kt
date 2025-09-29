@@ -57,6 +57,7 @@ class CartViewModel ( private val cartRepository: CartRepository = CartRepositor
                             }
                         }
                     }
+
                     is NetworkResult.Error -> {
                         // Si hay error verificando, intentar agregar de todos modos
                         val cartRequest = CartRequest(userId, productId, quantity)
@@ -64,6 +65,7 @@ class CartViewModel ( private val cartRepository: CartRepository = CartRepositor
                             _addToCartResult.postValue(result)
                         }
                     }
+
                     is NetworkResult.Loading -> {
                         // Waiting...
                     }
@@ -92,24 +94,29 @@ class CartViewModel ( private val cartRepository: CartRepository = CartRepositor
 
     // Manejar incremento de cantidad desde el adapter
     fun handleIncreaseQuantity(userId: Int, product: Product, newQuantity: Int) {
-        if (newQuantity == 1) {
-            // Primera vez agregando al carrito
-            addToCart(userId, product.idProduct, 1)
-        } else {
-            // Ya existe, buscar el cart item y actualizar
-            viewModelScope.launch {
-                cartRepository.getCartItem(userId, product.idProduct).collect { result ->
-                    when (result) {
-                        is NetworkResult.Success -> {
-                            result.data?.let { cartItem ->
-                                updateCartQuantity(cartItem.idCart, newQuantity)
-                            }
-                        }
-                        else -> {
-                            // Fallback: agregar como nuevo item
+        viewModelScope.launch {
+            cartRepository.getCartItem(userId, product.idProduct).collect { result ->
+                when (result) {
+                    is NetworkResult.Success -> {
+                        val cartItem = result.data
+                        if (cartItem != null) {
+                            // Ya existe en el carrito, actualizar
+                            updateCartQuantity(cartItem.idCart, newQuantity)
+                        } else {
+                            // No existe, agregar nuevo
                             addToCart(userId, product.idProduct, newQuantity)
                         }
                     }
+
+                    is NetworkResult.Error -> {
+                        // Si hay error (404), agregar como nuevo item
+                        addToCart(userId, product.idProduct, newQuantity)
+                    }
+
+                    is NetworkResult.Loading -> {
+                        // Esperar
+                    }
+
                 }
             }
         }
@@ -121,17 +128,24 @@ class CartViewModel ( private val cartRepository: CartRepository = CartRepositor
             cartRepository.getCartItem(userId, product.idProduct).collect { result ->
                 when (result) {
                     is NetworkResult.Success -> {
-                        result.data?.let { cartItem ->
-                            if (newQuantity == 0) {
+                        val cartItem = result.data
+                        if (cartItem != null) {
+                            if (newQuantity <= 0) {
                                 removeFromCart(cartItem.idCart)
                             } else {
+                                // Actualizar cantidad
                                 updateCartQuantity(cartItem.idCart, newQuantity)
                             }
                         }
                     }
-                    else -> {
-                        // Error handling
+                    is NetworkResult.Error -> {
+                        // Item no existe, no hacer nada
+                        _updateCartResult.postValue(NetworkResult.Error("Producto no está en el carrito"))
                     }
+                    is NetworkResult.Loading -> {
+                        // Esperar
+                    }
+
                 }
             }
         }
