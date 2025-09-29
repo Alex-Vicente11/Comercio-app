@@ -11,6 +11,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.oax.comercioapp.data.api.NetworkResult
+import com.oax.comercioapp.data.models.CartItem
 import com.oax.comercioapp.data.models.Product
 import com.oax.comercioapp.data.models.ProductRequest
 import com.oax.comercioapp.databinding.DialogAddProductBinding
@@ -27,6 +28,8 @@ class HomeFragment : Fragment() {
   private lateinit var productAdapter: ProductAdapter
   private lateinit var homeViewModel: HomeViewModel
   private lateinit var cartViewModel: CartViewModel
+
+  private var cartQuantities = mutableMapOf<Int, Int>()
 
   override fun onCreateView(
     inflater: LayoutInflater,
@@ -54,10 +57,21 @@ class HomeFragment : Fragment() {
       Log.d("HomeFragment", "Session changed: ${user?.userName}")
       updateHomeTitle(user?.userName)
 
-      /*user?.let {
-        cartViewModel.loadCartItems(it.idUser)
-      }*/
+      if (user != null) {
+        loadCartQuantities(user.idUser)
+      } else {
+        clearCartQuantities()
+      }
     }
+  }
+
+  private fun loadCartQuantities(userId: Int) {
+    cartViewModel.loadCartItems(userId)
+  }
+
+  private fun clearCartQuantities() {
+    cartQuantities.clear()
+    productAdapter.notifyDataSetChanged() // refrescar vista
   }
 
   private fun updateHomeTitle(userName: String?) {
@@ -70,29 +84,32 @@ class HomeFragment : Fragment() {
   }
 
   private fun setupRecyclerView() {
-    productAdapter = ProductAdapter(object : ProductEvents {
-      override fun increaseQuantity(product: Product, quantity: Int) {
-        Log.i("DEBUG", "${product}  -> quantity ${quantity}")
-        val currentUser = SessionManager.getCurrentUser()
-        if (currentUser != null) {
-          cartViewModel.handleIncreaseQuantity(currentUser.idUser, product, quantity)
-        } else {
-          Toast.makeText(context, "Inicia sesión para agregar productos al carrito", Toast.LENGTH_SHORT).show()
+    productAdapter = ProductAdapter(
+      onProductEvent = object : ProductEvents {
+        override fun increaseQuantity(product: Product, quantity: Int) {
+          val currentUser = SessionManager.getCurrentUser()
+          if (currentUser != null) {
+            cartViewModel.handleIncreaseQuantity(currentUser.idUser, product, quantity)
+          } else {
+            Toast.makeText(context, "Inicia sesión para agregar productos al carrito", Toast.LENGTH_SHORT).show()
+          }
         }
-      }
 
-      override fun decreaseQuantity(product: Product, quantity: Int) {
-        Log.i("DEBUG", "${product} -> decreasing to quantity ${quantity}")
-        val currentUser = SessionManager.getCurrentUser()
-        if (currentUser != null) {
-          cartViewModel.handleDecreaseQuantity(currentUser.idUser, product, quantity)
-        } else {
-          Toast.makeText(context, "Inicia sesión para modificar el carrito", Toast.LENGTH_SHORT).show()
+        override fun decreaseQuantity(product: Product, quantity: Int) {
+          val currentUser = SessionManager.getCurrentUser()
+          if (currentUser != null) {
+            cartViewModel.handleDecreaseQuantity(currentUser.idUser, product, quantity)
+          } else {
+            Toast.makeText(context, "Inicia sesión para modificar el carrito", Toast.LENGTH_SHORT).show()
+          }
         }
+      },
+      // Callback para obtener cantidades
+      getCurrentCartQuantity = { product ->
+        cartQuantities[product.idProduct] ?: 0
       }
+    )
 
-    })
-    
     binding.recyclerViewProducts.apply {
       layoutManager = LinearLayoutManager(context)
       adapter = productAdapter
@@ -131,10 +148,32 @@ class HomeFragment : Fragment() {
 
 
   private fun observeCartViewModel() {
+    // Observer para items del carrito
+    cartViewModel.cartItems.observe(viewLifecycleOwner) { result ->
+      when (result) {
+        is NetworkResult.Success -> {
+          updateCartQuantities(result.data)
+        }
+        is NetworkResult.Error -> {
+          // Limpiar cantidades en caso de error
+          cartQuantities.clear()
+          productAdapter.notifyDataSetChanged()
+        }
+        is NetworkResult.Loading -> {
+          // No hacer nada durante la carga
+        }
+      }
+    }
+
     cartViewModel.addToCartResult.observe(viewLifecycleOwner) { result ->
       when (result) {
         is NetworkResult.Success -> {
           Toast.makeText(context, "Producto agregado al carrito", Toast.LENGTH_SHORT).show()
+
+          // Recargar cantidades después de agregar
+          SessionManager.getCurrentUser()?.let { user ->
+            cartViewModel.loadCartItems(user.idUser)
+          }
         }
         is NetworkResult.Error -> {
           Toast.makeText(context, "Error al agregar al carrito: ${result.message}", Toast.LENGTH_SHORT).show()
@@ -148,6 +187,10 @@ class HomeFragment : Fragment() {
     cartViewModel.updateCartResult.observe(viewLifecycleOwner) { result ->
       when (result) {
         is NetworkResult.Success -> {
+          // Recargar carrito despues de actualizar
+          SessionManager.getCurrentUser()?.let { user ->
+            cartViewModel.loadCartItems(user.idUser)
+          }
           Toast.makeText(context, "Carrito actualizado", Toast.LENGTH_SHORT).show()
         }
         is NetworkResult.Error -> {
@@ -162,6 +205,9 @@ class HomeFragment : Fragment() {
     cartViewModel.removeFromCartResult.observe(viewLifecycleOwner) { result ->
       when (result) {
         is NetworkResult.Success -> {
+          SessionManager.getCurrentUser()?.let { user ->
+            cartViewModel.loadCartItems(user.idUser)
+          }
           Toast.makeText(context, "Producto eliminado del carrito", Toast.LENGTH_SHORT).show()
         }
         is NetworkResult.Error -> {
@@ -172,6 +218,20 @@ class HomeFragment : Fragment() {
         }
       }
     }
+
+  }
+
+  private fun updateCartQuantities(cartItems: List<CartItem>) {
+    // Limpiar cantidades anteriores
+    cartQuantities.clear()
+
+    // Actualizar con cantidades del carrito
+    cartItems.forEach { cartItem ->
+      cartQuantities[cartItem.product.idProduct] = cartItem.quantity
+    }
+
+    // Notificar al adapter para actualizar la vista
+    productAdapter.notifyDataSetChanged()
   }
   private fun setupClickListeners(){
     binding.fabAddProduct.setOnClickListener {
