@@ -150,4 +150,34 @@ class CartViewModel ( private val cartRepository: CartRepository = CartRepositor
             }
         }
     }
+
+    fun clearQuantitiesFromCart(userId: Int, product: Product) {
+        viewModelScope.launch {
+            println("DEBUG: clearQuantitiesFromCart - userId: $userId, productId: ${product.idProduct}")
+            cartRepository.getCartItem(userId, product.idProduct).collect { result ->
+                when (result) {
+                    is NetworkResult.Success -> {
+                        val cartItem = result.data
+                        println("DEBUG: Cart item found: $cartItem")
+                        if (cartItem != null) {
+                            // Eliminar completamente del carrito
+                            println("DEBUG: Calling removeFromCart with cartId: ${cartItem.idCart}")
+                            removeFromCart(cartItem.idCart)
+                        } else {
+                            // No está en el carrito, no hacer nada
+                            _removeFromCartResult.postValue(
+                                NetworkResult.Success(CartResponse("success", "No hay productos en el carrito"))
+                            )
+                        }
+                    }
+                    is NetworkResult.Error -> {
+                        _removeFromCartResult.postValue(NetworkResult.Error("Producto no encontrado"))
+                    }
+                    is NetworkResult.Loading -> {
+                        // Esperar
+                    }
+                }
+            }
+        }
+    }
 }

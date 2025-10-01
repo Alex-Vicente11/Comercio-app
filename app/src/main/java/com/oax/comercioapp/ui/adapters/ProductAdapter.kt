@@ -1,5 +1,6 @@
 package com.oax.comercioapp.ui.adapters
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
@@ -11,6 +12,7 @@ import com.oax.comercioapp.databinding.ItemProductBinding
 interface ProductEvents {
     fun increaseQuantity(product: Product, quantity: Int)
     fun decreaseQuantity(product: Product, quantity: Int)
+    fun removeQuantities(product: Product)
 }
 
 class ProductAdapter(
@@ -55,6 +57,16 @@ class ProductAdapter(
                 val newQty = maxOf(0, qty - 1)
                 binding.addToCartButton.quantityAdded.text = newQty.toString()
                 onProductEvent.decreaseQuantity(product, newQty)
+            }
+
+            binding.removeQuantitiesButton.removeQuantities.setOnClickListener {
+                val qty = getCurrentCartQuantity(product)
+                if (qty > 0) {
+                    binding.addToCartButton.quantityAdded.text = "0"
+                    onProductEvent.removeQuantities(product)
+                } else {
+                    Log.d("ProductAdapter", "Product not in cart, quantity is 0")
+                }
             }
         }
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.button.MaterialButton
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:id="@+id/removeQuantities"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        app:icon="@drawable/ic_delete"
+        app:iconTint="@color/black"
+        app:strokeColor="@color/purple_500"
+        app:iconGravity="textStart"
+        app:strokeWidth="2dp"
+        app:iconPadding="0dp"
+        android:gravity="center" />
+
+</LinearLayout>

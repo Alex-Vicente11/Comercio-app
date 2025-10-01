@@ -103,6 +103,29 @@ class HomeFragment : Fragment() {
             Toast.makeText(context, "Inicia sesión para modificar el carrito", Toast.LENGTH_SHORT).show()
           }
         }
+
+        override fun removeQuantities(product: Product) {
+          val currentUser = SessionManager.getCurrentUser()
+          if (currentUser != null) {
+            val currentQty = cartQuantities[product.idProduct] ?: 0
+            if (currentQty > 0) {
+              // Mostrar dialogo de confirmacion
+              AlertDialog.Builder(requireContext())
+                .setTitle("Eliminar cantidad total del carrito")
+                .setMessage("¿Desea elimnar las cantidades de ${product.product} del carrito?")
+                .setPositiveButton("Eliminar") { _, _ ->
+                  cartViewModel.clearQuantitiesFromCart(currentUser.idUser, product)
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+            } else {
+              Toast.makeText(context, "Este producto no está en el carrito", Toast.LENGTH_SHORT).show()
+            }
+          }else {
+            Toast.makeText(context, "Inicia sesión para eliminar del carrito", Toast.LENGTH_SHORT).show()
+          }
+
+        }
       },
       // Callback para obtener cantidades
       getCurrentCartQuantity = { product ->
