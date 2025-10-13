@@ -9,8 +9,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 
-class ProductRepository {
+class ProductRepository(
     private val apiService: ApiService = RetrofitClient.apiService
+) {
     
     suspend fun getProducts(): Flow<NetworkResult<List<Product>>> = flow {
         emit(NetworkResult.Loading())

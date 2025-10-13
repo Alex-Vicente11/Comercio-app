@@ -21,18 +21,15 @@ class ProductRepositoryTest {
     @Before
     fun setup() {
         apiService = mockk()
-        repository = ProductRepository()
-
-        // Para poder inyectar el mock necesitaríamos modificar ProductRepository
-        // Por ahora las pruebas validarán la lógica pero requerirán refactorización
+        repository = ProductRepository(apiService)
     }
 
     @Test
     fun `getProducts emits Loading then Success when API call succeeds`() = runTest {
         // Given
         val mockProducts = listOf(
-            Product(1, "Product 1", "Description 1", 100.0, "image1.jpg"),
-            Product(2, "Product 2", "Description 2", 200.0, "image2.jpg")
+            Product(1, "Product 1", 100.0),
+            Product(2, "Product 2", 200.0)
         )
         val response = Response.success(mockProducts)
         coEvery { apiService.getProducts() } returns response
@@ -100,7 +97,7 @@ class ProductRepositoryTest {
     @Test
     fun `getProductById emits Loading then Success when API call succeeds`() = runTest {
         // Given
-        val mockProduct = Product(1, "Product 1", "Description 1", 100.0, "image1.jpg")
+        val mockProduct = Product(1, "Product 1", 100.0)
         val response = Response.success(mockProduct)
         coEvery { apiService.getProductById(1) } returns response
 
@@ -133,7 +130,7 @@ class ProductRepositoryTest {
     @Test
     fun `createProduct emits Loading then Success when API call succeeds`() = runTest {
         // Given
-        val productRequest = ProductRequest("New Product", "Description", 150.0, "image.jpg")
+        val productRequest = ProductRequest("New Product", 150.0)
         val productResponse = ProductResponse("Product created successfully")
         val response = Response.success(productResponse)
         coEvery { apiService.createProduct(productRequest) } returns response
@@ -151,7 +148,7 @@ class ProductRepositoryTest {
     @Test
     fun `createProduct emits Loading then Error when API call fails`() = runTest {
         // Given
-        val productRequest = ProductRequest("New Product", "Description", 150.0, "image.jpg")
+        val productRequest = ProductRequest("New Product", 150.0)
         val response = Response.error<ProductResponse>(
             400,
             "Bad Request".toResponseBody()
@@ -171,7 +168,7 @@ class ProductRepositoryTest {
     @Test
     fun `updateProduct emits Loading then Success when API call succeeds`() = runTest {
         // Given
-        val updateRequest = ProductUpdateRequest("Updated Product", "Updated Description", 175.0, "updated.jpg")
+        val updateRequest = ProductUpdateRequest("Updated Product", 175.0)
         val productResponse = ProductResponse("Product updated successfully")
         val response = Response.success(productResponse)
         coEvery { apiService.updateProduct(1, updateRequest) } returns response
@@ -189,7 +186,7 @@ class ProductRepositoryTest {
     @Test
     fun `updateProduct emits Loading then Error when empty response`() = runTest {
         // Given
-        val updateRequest = ProductUpdateRequest("Updated Product", "Updated Description", 175.0, "updated.jpg")
+        val updateRequest = ProductUpdateRequest("Updated Product", 175.0)
         val response = Response.success<ProductResponse>(null)
         coEvery { apiService.updateProduct(1, updateRequest) } returns response
 
