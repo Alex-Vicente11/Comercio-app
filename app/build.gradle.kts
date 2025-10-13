@@ -1,6 +1,7 @@
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
+  jacoco
 }
 
 android {
@@ -33,6 +34,46 @@ android {
   buildFeatures {
     viewBinding = true
   }
+
+  testOptions {
+    unitTests.isReturnDefaultValues = true
+  }
+}
+
+jacoco {
+  toolVersion = "0.8.12"
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+  dependsOn("testDebugUnitTest")
+
+  reports {
+    xml.required.set(true)
+    html.required.set(true)
+  }
+
+  val fileFilter = listOf(
+    "**/R.class",
+    "**/R$*.class",
+    "**/BuildConfig.*",
+    "**/Manifest*.*",
+    "**/*Test*.*",
+    "android/**/*.*",
+    "**/databinding/*",
+    "**/androidx/*"
+  )
+
+  val debugTree = fileTree("${project.buildDir}/tmp/kotlin-classes/debug") {
+    exclude(fileFilter)
+  }
+
+  val mainSrc = "${project.projectDir}/src/main/java"
+
+  sourceDirectories.setFrom(files(mainSrc))
+  classDirectories.setFrom(files(debugTree))
+  executionData.setFrom(fileTree(project.buildDir) {
+    include("jacoco/testDebugUnitTest.exec")
+  })
 }
 
 dependencies {
