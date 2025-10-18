@@ -31,6 +31,9 @@ class HomeFragment : Fragment() {
 
   private var cartQuantities = mutableMapOf<Int, Int>()
 
+  // Variable para trackear el ultimo usuario cargado
+  private var lastLoadedUserId: Int? = null
+
   override fun onCreateView(
     inflater: LayoutInflater,
     container: ViewGroup?,
@@ -57,9 +60,25 @@ class HomeFragment : Fragment() {
       Log.d("HomeFragment", "Session changed: ${user?.userName}")
       updateHomeTitle(user?.userName)
 
-      if (user != null) {
-        loadCartQuantities(user.idUser)
+      if (user != null && user.idUser > 0) {
+        // solo recargar si cambio el usuario
+        if (lastLoadedUserId != user.idUser){
+          Log.d("HomeFragment", "Usuario cambió de $lastLoadedUserId a ${user.idUser}, recargando carrito...")
+
+          // Limpiar cantidades anteriores
+          cartQuantities.clear()
+          productAdapter.notifyDataSetChanged()
+
+          lastLoadedUserId = user.idUser
+
+          //cargar cantidades del nuevo usuario
+          loadCartQuantities(user.idUser)
+        }else {
+          Log.d("HomeFragment", "Mismo usuario, no se recarga carrito")
+        }
       } else {
+        //Usuario cerro sesion
+        lastLoadedUserId = null
         clearCartQuantities()
       }
     }
@@ -70,6 +89,7 @@ class HomeFragment : Fragment() {
   }
 
   private fun clearCartQuantities() {
+    Log.d("HomeFragment", "Limpiando cantidades del carrito")
     cartQuantities.clear()
     productAdapter.notifyDataSetChanged() // refrescar vista
   }
@@ -245,6 +265,7 @@ class HomeFragment : Fragment() {
   }
 
   private fun updateCartQuantities(cartItems: List<CartItem>) {
+    Log.d("HomeFragment", "Actualizando cantidades del carrito...")
     // Limpiar cantidades anteriores
     cartQuantities.clear()
 
@@ -255,6 +276,8 @@ class HomeFragment : Fragment() {
 
     // Notificar al adapter para actualizar la vista
     productAdapter.notifyDataSetChanged()
+
+    Log.d("HomeFragment", "Vista actualizada con ${cartQuantities.size} productos en carrito")
   }
   private fun setupClickListeners(){
     binding.fabAddProduct.setOnClickListener {
@@ -354,6 +377,12 @@ class HomeFragment : Fragment() {
     val currentUser = SessionManager.getCurrentUser()
     updateHomeTitle(currentUser?.userName)
     Log.d("HomeFragment", "onResume - Current user: ${currentUser?.userName}")
+
+    if (currentUser == null || currentUser.idUser <= 0) {
+      Log.d("HomeFragment", "No hay usuario valido en onResume, limpiando carrito")
+      lastLoadedUserId = null
+      clearCartQuantities()
+    }
   }
 
   override fun onDestroyView() {

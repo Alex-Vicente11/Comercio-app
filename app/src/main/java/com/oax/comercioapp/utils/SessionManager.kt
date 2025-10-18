@@ -76,8 +76,10 @@ object SessionManager {
      */
     fun login(user: User?) {
         try {
+            println("$TAG: Usuario recibido: ${user?.userName} (ID: ${user?.idUser}")
+
             if (user == null) {
-                println("$TAG: Error - Intento de login con usuario null")
+                println("$TAG: Error - Usuario es null")
                 return
             }
 
@@ -86,7 +88,8 @@ object SessionManager {
                 return
             }
 
-            _currentUser.postValue(user)
+            println("$TAG: Actualizando LiveData...")
+            _currentUser.value = user
             updateSessionStatus(user)
 
             println("$TAG: LiveData updated - Current observers: ${_currentUser.hasObservers()}") //log para seguimiento de session
@@ -181,13 +184,14 @@ object SessionManager {
         try {
             val userName = _currentUser.value?.userName ?: "Usuario desconocido"
 
-            // Limpiar estado en memoria
-            _currentUser.postValue(null)
+            // Limpiar estado en memoria de forma sincrona
+            _currentUser.value = null
             updateSessionStatus(null)
 
             // Limpiar SharedPreferences
             try {
                 PreferencesManager.clearUserSession()
+                println("$TAG: SharedPreferences limpiado")
             } catch (e: Exception) {
                 println("$TAG: Error al limpiar SharedPreferences: ${e.message}")
             }
@@ -371,10 +375,11 @@ object SessionManager {
                 if (!it.userName.isNullOrBlank()) "Sesión: ${it.userName}" else "Sesión: Usuario sin nombre"
             } ?: "No hay sesión activa"
 
-            _sessionStatus.postValue(status)
+            _sessionStatus.value = status
+            println("$TAG: Estado de sesión actualizado: $status")
         } catch (e: Exception) {
             println("$TAG: Error al actualizar estado: ${e.message}")
-            _sessionStatus.postValue("Error en sesión")
+            _sessionStatus.value = "Error en sesión"
         }
     }
 }
