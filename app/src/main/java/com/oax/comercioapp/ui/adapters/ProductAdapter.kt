@@ -33,6 +33,14 @@ class ProductAdapter(
         holder.bind(getItem(position))
     }
 
+    override fun onBindViewHolder(holder: ProductViewHolder, position: Int, payloads: MutableList<Any?>) {
+        if (payloads.isEmpty()) {
+            super.onBindViewHolder(holder, position, payloads)
+        } else {
+            holder.updateQuantity(getItem(position))
+        }
+    }
+
     inner class ProductViewHolder(
         private val binding: ItemProductBinding
     ) : RecyclerView.ViewHolder(binding.root) {
@@ -41,9 +49,8 @@ class ProductAdapter(
             binding.textProductName.text = product.product
             binding.textProductPrice.text = "$${"%.2f".format(product.price)}"
 
-            // Actualizar el TextView cada vez que se hace bind
-            val currentQuantity = getCurrentCartQuantity(product)
-            binding.addToCartButton.quantityAdded.text = currentQuantity.toString()
+            // Actualizar cantidad
+            updateQuantity(product)
 
             binding.addToCartButton.increaseQuantity.setOnClickListener {
                 // Obtener cantidad freca cada vez
@@ -68,6 +75,11 @@ class ProductAdapter(
                     Log.d("ProductAdapter", "Product not in cart, quantity is 0")
                 }
             }
+        }
+        fun updateQuantity(product: Product) {
+            val currentQuantity = getCurrentCartQuantity(product)
+            binding.addToCartButton.quantityAdded.text = currentQuantity.toString()
+            Log.d("ProductAdapter", "Updated quantity for product ${product.idProduct}: $currentQuantity")
         }
 
     }

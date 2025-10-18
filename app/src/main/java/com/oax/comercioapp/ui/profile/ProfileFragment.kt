@@ -65,7 +65,7 @@ class ProfileFragment : Fragment() {
           setButtonsEnabled(false)
         }
         is NetworkResult.Success -> {
-
+          Log.d("ProfileFragment", "Usuario cargado exitosamente: ${result.data}")
           viewModel.setCurrentUser(result.data)
           setButtonsEnabled(true)
         }

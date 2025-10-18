@@ -1,5 +1,6 @@
 package com.oax.comercioapp.ui.profile
 
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -32,6 +33,7 @@ class ProfileViewModel : ViewModel() {
     fun setCurrentUser(user: User) {
 
         SessionManager.login(user)
+        Log.d("ProfileViewModel", "SessionManager.login() ejecutado")
 
         //Para guardar en SharedPreferences para persistir la sesion
         //E iniciliciar datos especificos del usuario (carrito, preferencias, etc)
@@ -44,6 +46,7 @@ class ProfileViewModel : ViewModel() {
     fun isUserLoggedIn(): Boolean = SessionManager.isLoggedIn()
 
     fun logout() {
+        Log.d("ProfileViewModel", "Ejecutando logout desde ViewModel")
         SessionManager.logout()
 
         // Para limpiar SharedPreferences
