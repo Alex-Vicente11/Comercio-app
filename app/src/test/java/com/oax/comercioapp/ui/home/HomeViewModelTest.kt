@@ -6,7 +6,9 @@ import com.oax.comercioapp.data.models.Product
 import com.oax.comercioapp.data.models.ProductRequest
 import com.oax.comercioapp.data.models.ProductResponse
 import com.oax.comercioapp.data.repository.ProductRepository
-import io.mockk.verify
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -18,13 +20,6 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.mockito.Mock
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
-import org.mockito.MockitoAnnotations.openMocks
-import org.mockito.internal.verification.VerificationModeFactory.atLeastOnce
-import org.mockito.internal.verification.VerificationModeFactory.times
 
 //import org.junit.jupiter.api.Assertions.*
 
@@ -38,26 +33,22 @@ class HomeViewModelTest {
     // Dispatcher de prueba para coroutines
     private val testDispatcher = UnconfinedTestDispatcher()
 
-    // Mock del repositorio
-    @Mock
+    // Mock del repositorio usando MockK
     private lateinit var productRepository: ProductRepository
 
     // ViewModel a testear
     private lateinit var viewModel: HomeViewModel
 
-    //private val lateinit productRepository: ProductRepository = ProductRepository()) : ViewModel()
-
     @Before
     fun onBefore() {
-        // Iniciarlizar mocks
-        openMocks(this)
+        // Crear mock del repositorio (relaxed para retornar valores por defecto)
+        productRepository = mockk(relaxed = true)
 
         // Configurar dispatcher de prueba
         Dispatchers.setMain(testDispatcher)
 
         // Crear ViewModel con repositorio mock
         viewModel = HomeViewModel(productRepository)
-
     }
 
     @After
@@ -77,7 +68,7 @@ class HomeViewModelTest {
             val successResult = NetworkResult.Success(mockProducts)
 
             // Simular comportamiento del repositorio
-            `when`(productRepository.getProducts()).thenReturn(flowOf(successResult))
+            coEvery { productRepository.getProducts() } returns flowOf(successResult)
 
             // ACT (Actuar)
             viewModel.loadProducts()
@@ -96,7 +87,7 @@ class HomeViewModelTest {
         val errorMessage = "Error de conexión"
         val errorResult = NetworkResult.Error<List<Product>>(errorMessage, 500)
 
-        `when`(productRepository.getProducts()).thenReturn(flowOf(errorResult))
+        coEvery { productRepository.getProducts() } returns flowOf(errorResult)
 
         // ACT
         viewModel.loadProducts()
@@ -113,7 +104,7 @@ class HomeViewModelTest {
         // ARRANGE
         val loadingResult = NetworkResult.Loading<List<Product>>()
 
-        `when`(productRepository.getProducts()).thenReturn(flowOf(loadingResult))
+        coEvery { productRepository.getProducts() } returns flowOf(loadingResult)
 
         // ACT
         viewModel.loadProducts()
@@ -137,7 +128,7 @@ class HomeViewModelTest {
         )
         val successResult = NetworkResult.Success(productResponse)
 
-        `when`(productRepository.createProduct(productRequest)).thenReturn(flowOf(successResult))
+        coEvery { productRepository.createProduct(productRequest) } returns flowOf(successResult)
 
         // ACT
         viewModel.createProduct(productRequest)
@@ -159,7 +150,7 @@ class HomeViewModelTest {
 
         val errorResult = NetworkResult.Error<ProductResponse>("Precio inválido", 400)
 
-        `when`(productRepository.createProduct(productRequest)).thenReturn(flowOf(errorResult))
+        coEvery { productRepository.createProduct(productRequest) } returns flowOf(errorResult)
 
         // ACT
         viewModel.createProduct(productRequest)
@@ -176,15 +167,14 @@ class HomeViewModelTest {
         val mockProducts = listOf(
             Product(idProduct = 1, product = "Product 1", price = 100.0)
         )
-        `when`(productRepository.getProducts()).thenReturn(flowOf(NetworkResult.Success(mockProducts)))
-        viewModel = HomeViewModel(productRepository)
+        coEvery { productRepository.getProducts() } returns flowOf(NetworkResult.Success(mockProducts))
 
         // ACT
         viewModel.refreshProducts()
 
         // ASSERT
         // Se llama 2 veces: 1 en init + 1 en refresh
-        verify(productRepository, times(2)).getProducts()
+        coVerify(exactly = 2) { productRepository.getProducts() }
         assert(viewModel.products.value is NetworkResult.Success)
     }
 
@@ -192,14 +182,14 @@ class HomeViewModelTest {
     fun `init carga productos automáticamente`() = runTest {
         // ASSERT
         // El viewModel ya se creó en setup(), verificamos que se llamó getProducts()
-        verify(productRepository, atLeastOnce()).getProducts()
+        coVerify(atLeast = 1) { productRepository.getProducts() }
     }
 
     @Test
     fun `products LiveData está vacio antes de cargar datos`() = runTest {
         // ARRANGE - Crear un nuevo ViewModel sin cargar datos
         val emptyResult = NetworkResult.Success(emptyList<Product>())
-        `when`(productRepository.getProducts()).thenReturn(flowOf(emptyResult))
+        coEvery { productRepository.getProducts() } returns flowOf(emptyResult)
 
         val newViewModel = HomeViewModel(productRepository)
 
