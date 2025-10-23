@@ -11,8 +11,10 @@ import com.oax.comercioapp.data.models.CartUpdateRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
-class CartRepository {
+class CartRepository(
     private val apiService: ApiService = RetrofitClient.apiService
+) {
+
 
     // Obtener items del carrito por usuario
     fun getCartItems(userId: Int): Flow<NetworkResult<List<CartItem>>> = flow {

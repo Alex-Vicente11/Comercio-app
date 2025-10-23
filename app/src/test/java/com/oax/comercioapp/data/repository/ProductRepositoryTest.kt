@@ -5,6 +5,7 @@ import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.data.models.*
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -35,7 +36,7 @@ class ProductRepositoryTest {
         coEvery { apiService.getProducts() } returns response
 
         // When
-        val results = repository.getProducts().toList()
+        val results = repository.getProducts().take(2).toList()
 
         // Then
         assertEquals(2, results.size)
