@@ -44,6 +44,8 @@ data class CartUpdateRequest(
     val quantity: Int
 )
 
+/*
+    (Eliminar)
 data class CartResponse(
     @SerializedName("success")
     val success: String,
@@ -53,4 +55,4 @@ data class CartResponse(
 
     @SerializedName("data")
     val data: Cart? = null
-)
+)*/
