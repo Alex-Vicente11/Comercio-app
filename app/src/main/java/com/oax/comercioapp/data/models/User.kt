@@ -7,7 +7,16 @@ data class User(
     val idUser: Int,
     
     @SerializedName("user_name")
-    val userName: String
+    val userName: String,
+
+    @SerializedName("email")
+    val email: String? = null,
+
+    @SerializedName("is_guest")
+    val isGuest: Boolean = false,
+
+    @SerializedName("token")
+    val token: String? = null
 )
 
 data class UserRequest(
