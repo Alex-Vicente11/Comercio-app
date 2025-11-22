@@ -3,6 +3,7 @@ package com.oax.comercioapp.utils
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.oax.comercioapp.data.api.NetworkResult
+import com.oax.comercioapp.data.local.UserPreferences
 import com.oax.comercioapp.data.models.User
 import com.oax.comercioapp.data.repository.UserRepository
 import kotlinx.coroutines.CoroutineScope
@@ -78,13 +79,9 @@ object SessionManager {
         try {
             println("$TAG: Usuario recibido: ${user?.userName} (ID: ${user?.idUser}")
 
-            if (user == null) {
-                println("$TAG: Error - Usuario es null")
-                return
-            }
 
-            if (user.idUser <= 0 || user.userName.isNullOrBlank()) {
-                println("$TAG: Error - Usuario con datos inválidos: ID=${user.idUser}, Name='${user.userName}'")
+            if (user == null || user.idUser <= 0 || user.userName.isNullOrBlank()) {
+                println("$TAG: Error - Usuario con datos inválidos: ID=${user?.idUser}, Name='${user?.userName}'")
                 return
             }
 
@@ -96,8 +93,9 @@ object SessionManager {
 
             // Persistir solo si PreferencesManager está disponible
             try {
-                PreferencesManager.saveUserSession(user.idUser, user.userName)
-                println("$TAG: Sesión iniciada y persistida: ${user.userName} (ID: ${user.idUser})")
+                UserPreferences.saveUser(user)
+                val userType = if (user.isGuest) "GUEST" else "AUTHENTICATED"
+                println("$TAG: Sesión iniciada y persistida: ${user.userName} (ID: ${user.idUser} - Tipo: $userType)")
             } catch (e: Exception) {
                 println("$TAG: Error al persistir sesión: ${e.message}")
                 // Continuar aunque falle la persistencia
@@ -116,55 +114,86 @@ object SessionManager {
         try {
             _isRestoring.postValue(true)
 
-            val userId = PreferencesManager.getUserId()
-            val userName = PreferencesManager.getUserName()
+            // Cambio PreferencesManager -> UserPreferences
+            val userId = UserPreferences.getUserId()
+            val userName = UserPreferences.getUserName()
+            val token = UserPreferences.getAuthToken()
+            val email = UserPreferences.getEmail()
+            val isGuest = UserPreferences.isGuest()
 
-            println("$TAG: Datos de SharedPreferences - UserID: $userId, UserName: '$userName'")
+            println("$TAG: Datos de SharedPreferences - UserID: $userId, UserName: '$userName', IsGuest: $isGuest")
 
+            // Validar datos basicos
             if (userId <= 0 || userName.isNullOrBlank()) {
                 println("$TAG: Datos inválidos en SharedPreferences, limpiando...")
-                PreferencesManager.clearUserSession()
+                UserPreferences.clearUser()
                 updateSessionStatus(null)
                 _isRestoring.postValue(false)
                 return
             }
 
-            // Crear usuario básico como fallback
-            val basicUser = User(userId, userName)
+            // Crear usuario básico como fallback (NUEVO->) Si hay token, crear usuario con token
+            val basicUser = User(
+                userId,
+                userName = userName,
+                email = email,
+                isGuest = isGuest,
+                token = token
+            )
 
-            // Intentar cargar desde API
+            _currentUser.postValue(basicUser)
+            updateSessionStatus(basicUser)
+
+            // Si es usuario autenticado, validar token con API
+            if (!isGuest && token != null) {
+                // TODO: Implementar validación de token JWT
+                // sessionScope.launch {
+                //     try {
+                //         val response = RetrofitClient.apiService.validateToken()
+                //         if (!response.isSuccessful || response.body()?.valid != true) {
+                //             println("$TAG: Token inválido, cerrando sesión")
+                //             logout()
+                //             return@launch
+                //         }
+                //     } catch (e: Exception) {
+                //         println("$TAG: Error validando token: ${e.message}")
+                //     }
+                // }
+                println("$TAG: Token encontrado pero validación no implementada")
+            }
+
+
+
+            // Intentar cargar datos completos desde API (enriquecimiento)
             sessionScope.launch {
                 try {
                     userRepository.getUserById(userId).collect { result ->
                         when (result) {
                             is NetworkResult.Loading -> {
-                                println("$TAG: Cargando usuario desde API...")
+                                println("$TAG: Cargando datos completos desde API...")
                             }
                             is NetworkResult.Success -> {
                                 val apiUser = result.data
                                 if (apiUser != null && apiUser.idUser > 0 && !apiUser.userName.isNullOrBlank()) {
+                                    // Actualizar con datos completos de API
                                     _currentUser.postValue(apiUser)
                                     updateSessionStatus(apiUser)
-                                    println("$TAG: Sesión restaurada desde API: ${apiUser.userName}")
+                                    println("$TAG: Sesión enriquecida con datos de API: ${apiUser.userName}")
                                 } else {
-                                    println("$TAG: Usuario de API inválido, usando datos básicos")
-                                    _currentUser.postValue(basicUser)
-                                    updateSessionStatus(basicUser)
+                                    println("$TAG: Usuario de API inválido, manteniendo datos básicos")
                                 }
                                 _isRestoring.postValue(false)
                             }
                             is NetworkResult.Error -> {
                                 println("$TAG: Error API (${result.message}), usando datos básicos")
-                                _currentUser.postValue(basicUser)
-                                updateSessionStatus(basicUser)
+                                // basicUser ya esta establecido, no hacer nada
                                 _isRestoring.postValue(false)
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    println("$TAG: Excepción en restauración API: ${e.message}")
-                    _currentUser.postValue(basicUser)
-                    updateSessionStatus(basicUser)
+                    println("$TAG: Excepción en carga desde API: ${e.message}")
+                    // basicUser ya está establecido
                     _isRestoring.postValue(false)
                 }
             }
@@ -190,7 +219,7 @@ object SessionManager {
 
             // Limpiar SharedPreferences
             try {
-                PreferencesManager.clearUserSession()
+                UserPreferences.clearUser()
                 println("$TAG: SharedPreferences limpiado")
             } catch (e: Exception) {
                 println("$TAG: Error al limpiar SharedPreferences: ${e.message}")
@@ -229,7 +258,7 @@ object SessionManager {
                                 if (updatedUser != null && updatedUser.idUser > 0) {
                                     _currentUser.postValue(updatedUser)
                                     updateSessionStatus(updatedUser)
-                                    PreferencesManager.saveUserSession(updatedUser.idUser, updatedUser.userName)
+                                    UserPreferences.saveUser(updatedUser)
                                     println("$TAG: Usuario actualizado: ${updatedUser.userName}")
                                 } else {
                                     println("$TAG: Usuario actualizado es inválido")
@@ -310,7 +339,13 @@ object SessionManager {
         return try {
             val memoryUser = _currentUser.value
             val memoryInfo = if (memoryUser != null) {
-                "Usuario en memoria: ${memoryUser.userName} (ID: ${memoryUser.idUser})"
+                buildString {
+                    append("Usuario en memoria: ${memoryUser.userName} (ID: ${memoryUser.idUser})\n")
+                    append("Email: ${memoryUser.email ?: "N/A"}\n")
+                    append("Tipo: ${if (memoryUser.isGuest) "GUEST" else "AUTHENTICATED"}\n")
+                    append("Token: ${if (memoryUser.token != null) "SÍ" else "NO"}")
+                }
+
             } else {
                 "No hay usuario en memoria"
             }
@@ -349,9 +384,9 @@ object SessionManager {
 
     fun isSessionExpired(): Boolean {
         return try {
-            if (!PreferencesManager.hasActiveSession()) return true
+            if (!UserPreferences.isLoggedIn()) return true
 
-            val loginTime = PreferencesManager.getLoginTimestamp()
+            val loginTime = UserPreferences.getLoginTimestamp()
             if (loginTime <= 0) return true
 
             val currentTime = System.currentTimeMillis()
@@ -360,7 +395,11 @@ object SessionManager {
             // Sesión expira después de 30 días
             val maxSessionDuration = 30L * 24L * 60L * 60L * 1000L
 
-            sessionDuration > maxSessionDuration
+            val isExpired = sessionDuration > maxSessionDuration
+            if (isExpired) {
+                println("$TAG: Sesión expirada (${sessionDuration / (24 * 60 * 60 * 1000)} días")
+            }
+            isExpired
         } catch (e: Exception) {
             println("$TAG: Error al verificar expiración: ${e.message}")
             true
@@ -372,7 +411,10 @@ object SessionManager {
     private fun updateSessionStatus(user: User?) {
         try {
             val status = user?.let {
-                if (!it.userName.isNullOrBlank()) "Sesión: ${it.userName}" else "Sesión: Usuario sin nombre"
+                val userType = if (it.isGuest) "[GUEST]" else "[AUTH]"
+                if (!it.userName.isNullOrBlank()) {
+                    "Sesión: $userType: ${it.userName}"
+                } else "Sesión: $userType Usuario sin nombre"
             } ?: "No hay sesión activa"
 
             _sessionStatus.value = status
