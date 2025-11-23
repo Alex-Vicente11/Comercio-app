@@ -10,15 +10,13 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
-import com.google.android.gms.cast.framework.SessionManager
 import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.data.models.User
 import com.oax.comercioapp.databinding.FragmentProfileBinding
 import java.lang.NumberFormatException
 import com.oax.comercioapp.R
-import com.oax.comercioapp.data.models.CartItem
+import com.oax.comercioapp.data.models.CartItemDetailed
 import com.oax.comercioapp.ui.home.CartViewModel
-import com.oax.comercioapp.utils.SessionManager.currentUser
 
 class ProfileFragment : Fragment() {
 
@@ -105,7 +103,7 @@ class ProfileFragment : Fragment() {
     }
   }
 
-  private fun formatCartItems(cartItems: List<CartItem>): String { //carItems = result
+  private fun formatCartItems(cartItems: List<CartItemDetailed>): String { //carItems = result
     if (cartItems.isEmpty()) {
       return "Carrito vacío\n\nVe a 'Productos' para agregar productos a tu carrito"
     }
@@ -224,7 +222,7 @@ class ProfileFragment : Fragment() {
       Log.d("ProfileFragment", "Setting user session: ${currentUser.userName}")
 
       // Cargar items del carrito
-      cartViewModel.loadCartItems(currentUser.idUser)
+      cartViewModel.loadCartItems()
 
       binding.sessionInfo.text = buildSessionInfo(currentUser)
 
