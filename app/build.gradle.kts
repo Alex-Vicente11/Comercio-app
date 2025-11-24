@@ -95,6 +95,9 @@ dependencies {
   // Retrofit for REST API calls
   implementation("com.squareup.retrofit2:retrofit:2.9.0")
   implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+  // OkHttp para logging e interceptors
+  implementation("com.squareup.okhttp3:okhttp:4.12.0")
   implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
   // Coroutines for async operations
@@ -107,6 +110,11 @@ dependencies {
   // RecyclerView
   implementation("androidx.recyclerview:recyclerview:1.3.2")
 
+  // DataStore (para guardar datos de forma segura)
+  implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+  // Opcional: Encrypted SharedPreferences
+  implementation("androidx.security:security-crypto:1.1.0-alpha06")
   // ============================================
   // TESTING DEPENDENCIES (JUnit 4)
   // ============================================
