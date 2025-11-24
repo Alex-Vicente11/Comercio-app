@@ -7,6 +7,7 @@ import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
+import com.oax.comercioapp.data.local.UserPreferences
 import com.oax.comercioapp.databinding.ActivityMainBinding
 import com.oax.comercioapp.utils.PreferencesManager
 import com.oax.comercioapp.utils.SessionManager
@@ -17,6 +18,8 @@ class MainActivity : AppCompatActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
+    UserPreferences.init(this)
 
     // Inicializar sistemas de persistencia
     initializePersistenceSystems()
