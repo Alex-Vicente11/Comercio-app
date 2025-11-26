@@ -58,5 +58,43 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="30dp"
+        android:id="@+id/layoutButtonsLogin"
+        app:layout_constraintTop_toBottomOf="@+id/textInputLayoutPassword"
+        app:layout_constraintStart_toStartOf="parent"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="INICIAR SESIÓN"
+            android:id="@+id/buttonLogin"
+            android:backgroundTint="@color/green">
+
+        </Button>
+
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="80dp"
+            android:layout_marginTop="16dp"
+            app:dividerThickness="4dp"
+            app:dividerColor="@color/black"/>
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Continuar como Invitado"
+            android:layout_marginTop="16dp"
+            android:id="@+id/buttonGuest"
+            android:backgroundTint="@color/green">
+
+        </Button>
+    </LinearLayout>
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>
