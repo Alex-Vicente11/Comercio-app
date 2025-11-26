@@ -96,5 +96,23 @@
         </Button>
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="56dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/layoutButtonsLogin">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:id="@+id/tvToRegister"
+            android:layout_height="wrap_content"
+            android:text="¿No tienes cuenta? Regístrate "
+            android:textSize="16dp"
+            android:padding="16dp"
+            android:textColor="@color/black"/>
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
