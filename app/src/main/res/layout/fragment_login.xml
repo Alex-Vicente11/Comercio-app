@@ -12,13 +12,26 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="44dp"
         android:gravity="center"
-        android:text="Comercio App\n 'Inicia sesión para continuar'"
+        android:text="Comercio App\n'Inicia sesión para continuar'"
         android:textSize="20sp"
+        android:textStyle="bold"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toTopOf="parent" />
 
-    </TextView>
+    <!-- ERROR MESSAGE (hidden by default) -->
+    <TextView
+        android:id="@+id/tvErrorMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:textColor="@android:color/holo_red_dark"
+        android:textSize="14sp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/TextEnter" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/textInputLayoutEmail"
@@ -26,15 +39,16 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
         android:hint="Email"
+        app:errorEnabled="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/TextEnter">
+        app:layout_constraintTop_toBottomOf="@+id/tvErrorMessage">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/textEditEmail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="text"
+            android:inputType="textEmailAddress"
             android:maxLines="1" />
 
     </com.google.android.material.textfield.TextInputLayout>
@@ -43,8 +57,10 @@
         android:id="@+id/textInputLayoutPassword"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:hint="Password"
+        android:layout_marginTop="16dp"
+        android:hint="Contraseña"
+        app:endIconMode="password_toggle"
+        app:errorEnabled="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textInputLayoutEmail">
@@ -53,65 +69,77 @@
             android:id="@+id/textEditPassword"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="text"
+            android:inputType="textPassword"
             android:maxLines="1" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- LOADING INDICATOR (hidden by default) -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/textInputLayoutPassword" />
+
     <LinearLayout
+        android:id="@+id/layoutButtonsLogin"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="30dp"
-        android:id="@+id/layoutButtonsLogin"
-        app:layout_constraintTop_toBottomOf="@+id/textInputLayoutPassword"
-        app:layout_constraintStart_toStartOf="parent"
         android:orientation="vertical"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/progressBar">
 
         <Button
+            android:id="@+id/buttonLogin"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="INICIAR SESIÓN"
-            android:id="@+id/buttonLogin"
-            android:backgroundTint="@color/green">
-
-        </Button>
+            android:backgroundTint="@color/green"
+            android:text="INICIAR SESIÓN"
+            android:textStyle="bold" />
 
         <com.google.android.material.divider.MaterialDivider
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="80dp"
             android:layout_marginTop="16dp"
-            app:dividerThickness="4dp"
-            app:dividerColor="@color/black"/>
+            android:paddingHorizontal="80dp"
+            app:dividerColor="@color/black"
+            app:dividerThickness="2dp" />
 
         <Button
+            android:id="@+id/buttonGuest"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Continuar como Invitado"
             android:layout_marginTop="16dp"
-            android:id="@+id/buttonGuest"
-            android:backgroundTint="@color/green">
+            android:backgroundTint="@color/green"
+            android:textSize="16dp"
+            android:text="Continuar como Invitado"/>
 
-        </Button>
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="56dp"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/layoutButtonsLogin">
 
         <TextView
-            android:layout_width="wrap_content"
             android:id="@+id/tvToRegister"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="¿No tienes cuenta? Regístrate "
-            android:textSize="16dp"
             android:padding="16dp"
-            android:textColor="@color/black"/>
+            android:text="¿No tienes cuenta? Regístrate"
+            android:textColor="@color/purple_700"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 

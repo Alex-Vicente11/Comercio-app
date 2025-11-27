@@ -2,7 +2,8 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:padding="20dp">
 
     <LinearLayout
         android:id="@+id/layoutTvHeader"
@@ -17,14 +18,12 @@
             android:id="@+id/tvCreateLogin"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="34dp"
+            android:layout_marginTop="24dp"
             android:gravity="center"
             android:text="Crear Cuenta"
             android:textColor="@color/black"
-            android:textSize="32sp">
-
-
-        </TextView>
+            android:textSize="32sp"
+            android:textStyle="bold" />
 
         <TextView
             android:layout_width="match_parent"
@@ -33,31 +32,41 @@
             android:gravity="center"
             android:text="Completa tus datos"
             android:textColor="@color/black"
-            android:textSize="16sp">
-
-        </TextView>
+            android:textSize="16sp" />
 
     </LinearLayout>
 
+    <!-- ERROR MESSAGE (hidden by default) -->
+    <TextView
+        android:id="@+id/tvErrorMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:textColor="@android:color/holo_red_dark"
+        android:textSize="14sp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/layoutTvHeader" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/inputLayoutCompleteNameCreateAccount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="54dp"
+        android:layout_marginTop="24dp"
         android:hint="Nombre completo"
-        android:paddingStart="28dp"
-        android:paddingEnd="28dp"
         app:errorEnabled="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/layoutTvHeader">
+        app:layout_constraintTop_toBottomOf="@+id/tvErrorMessage">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/editTextCompleteNameCreateAccount"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
+            android:layout_height="wrap_content"
+            android:inputType="textPersonName"
+            android:maxLines="1" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -65,10 +74,9 @@
         android:id="@+id/inputLayoutEmailCreateAccount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:enabled="true"
+        android:layout_marginTop="16dp"
         android:hint="Email"
-        android:paddingStart="28dp"
-        android:paddingEnd="28dp"
+        app:errorEnabled="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/inputLayoutCompleteNameCreateAccount">
@@ -76,8 +84,9 @@
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/editTextEmailCreateAccount"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
+            android:layout_height="wrap_content"
+            android:inputType="textEmailAddress"
+            android:maxLines="1" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -85,11 +94,10 @@
         android:id="@+id/inputLayoutPasswordCreateAccount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="42dp"
-        android:enabled="true"
+        android:layout_marginTop="16dp"
         android:hint="Contraseña"
-        android:paddingStart="28dp"
-        android:paddingEnd="28dp"
+        app:endIconMode="password_toggle"
+        app:errorEnabled="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/inputLayoutEmailCreateAccount">
@@ -97,8 +105,9 @@
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/editTextPasswordCreateAccount"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
+            android:layout_height="wrap_content"
+            android:inputType="textPassword"
+            android:maxLines="1" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -106,11 +115,10 @@
         android:id="@+id/inputLayoutConfirmPasswordCreateAccount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="42dp"
-        android:enabled="true"
+        android:layout_marginTop="16dp"
         android:hint="Confirmar Contraseña"
-        android:paddingStart="28dp"
-        android:paddingEnd="28dp"
+        app:endIconMode="password_toggle"
+        app:errorEnabled="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/inputLayoutPasswordCreateAccount">
@@ -118,42 +126,55 @@
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/editTextConfirmPasswordCreateAccount"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:inputType="textPassword"
+            android:maxLines="1" />
 
     </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- LOADING INDICATOR (hidden by default) -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/inputLayoutConfirmPasswordCreateAccount" />
 
     <Button
         android:id="@+id/buttonRegisterCreateAccount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="80dp"
-        android:layout_marginTop="34dp"
-        android:layout_marginEnd="80dp"
+        android:layout_marginStart="40dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="40dp"
         android:backgroundTint="@color/green"
-        android:hint="REGISTRARSE"
+        android:text="REGISTRARSE"
+        android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/inputLayoutConfirmPasswordCreateAccount">
-
-    </Button>
-
+        app:layout_constraintTop_toBottomOf="@+id/progressBar" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="56dp"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/buttonRegisterCreateAccount">
 
         <TextView
             android:id="@+id/tvToLogInCreateAccount"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:text="¿Ya tienes cuenta? Inicia Sesión "
-            android:textColor="@color/black"
-            android:textSize="16dp" />
+            android:padding="16dp"
+            android:text="¿Ya tienes cuenta? Inicia Sesión"
+            android:textColor="@color/purple_700"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 
