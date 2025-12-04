@@ -30,7 +30,30 @@ class LoginFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupObservers()
+        setupTestingButtons()
+    }
 
+    private fun setupTestingButtons() {
+        println("MODO TESTING")
+
+        // Simular login exitoso
+        binding.buttonLogin.setOnClickListener {
+            println("\n Test 1: Login con credenciales de prueba")
+            authViewModel.login("test@test.com", "Test1234")
+        }
+
+        // Simular guest
+        binding.buttonGuest.setOnClickListener {
+            println("\n Test 2: Botón guest presionado")
+            Snackbar.make(binding.root, "Modo guest (sin implementar)", Snackbar.LENGTH_SHORT).show()
+        }
+
+        // Simular error manual
+        binding.tvForgotPassword.setOnClickListener {
+            println("\n Test 3: Simulacion error manual")
+            showLoading(false)
+            showError("Este es un error de prueba")
+        }
     }
 
 
