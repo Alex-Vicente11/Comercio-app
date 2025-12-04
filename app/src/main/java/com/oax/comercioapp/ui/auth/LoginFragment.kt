@@ -1,9 +1,11 @@
 package com.oax.comercioapp.ui.auth
 
 import android.os.Bundle
+import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.widget.addTextChangedListener
 import com.oax.comercioapp.R
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -30,7 +32,10 @@ class LoginFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupObservers()
-        setupTestingButtons()
+        setupClickListeners()
+        setupTextWatchers()
+
+        //setupTestingButtons()
     }
 
     private fun setupTestingButtons() {
@@ -91,8 +96,88 @@ class LoginFragment : Fragment() {
         }
     }
 
+    private fun setupClickListeners() {
+        binding.buttonLogin.setOnClickListener {
+            handleLoginClick()
+        }
+    }
+
+    private fun setupTextWatchers() {
+        binding.textEditEmail.addTextChangedListener {
+            clearEmailError()
+        }
+
+        binding.textEditPassword.addTextChangedListener {
+            clearPasswordError()
+        }
+    }
+
+    private fun handleLoginClick() {
+        clearAllErrors()
+        val email = binding.textEditEmail.text.toString().trim()
+        val password = binding.textEditPassword.text.toString()
+
+        if (!validateEmail(email)) return
+        if (!validatePassword(password)) return
+
+        authViewModel.login(email, password)
+    }
+
+    private fun validateEmail(email: String): Boolean {
+        return when {
+            email.isEmpty() -> {
+                binding.textInputLayoutEmail.error = getString(R.string.error_empty_email)
+                binding.textEditEmail.requestFocus()
+                false
+            }
+            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
+                binding.textInputLayoutEmail.error = getString(R.string.error_invalid_email)
+                binding.textEditEmail.requestFocus()
+                false
+            }
+            else -> {
+                binding.textInputLayoutEmail.error = null
+                true
+            }
+        }
+    }
+
+    private fun validatePassword(password: String): Boolean {
+        return when {
+            password.isEmpty() -> {
+                binding.textInputLayoutPassword.error = getString(R.string.error_empty_password)
+                binding.textEditPassword.requestFocus()
+                false
+            }
+            else -> {
+                binding.textInputLayoutPassword.error = null
+                true
+            }
+        }
+    }
+
+    private fun clearAllErrors() {
+        binding.textInputLayoutEmail.error = null
+        binding.textInputLayoutPassword.error = null
+        hideError()
+    }
+
+    private fun clearEmailError() {
+        binding.textInputLayoutEmail.error = null
+        hideError()
+    }
+
+    private fun clearPasswordError() {
+        binding.textInputLayoutPassword.error = null
+        hideError()
+    }
+
     private fun showLoading(isLoading: Boolean) {
         binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+        binding.buttonLogin.isEnabled = !isLoading
+        binding.buttonGuest.isEnabled = !isLoading
+        binding.textEditEmail.isEnabled = !isLoading
+        binding.textEditPassword.isEnabled = !isLoading
     }
 
     private fun showError(message: String) {
