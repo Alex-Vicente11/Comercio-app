@@ -74,7 +74,7 @@
     <string name="error_register_failed">Error al registrar. Intenta nuevamente.</string>
     <string name="error_network">Error de conexión. Verifica tu internet.</string>
 
-    <!-- Success Messages -->
+    <!-- Success Messages / LoginFragment -->
     <string name="success_login">Inicio de sesión exitoso</string>
     <string name="success_register">Registro exitoso</string>
 
