@@ -302,7 +302,10 @@ class AuthViewModel(
      * @return true si es válida (mínimo 8 caracteres)
      */
     private fun isValidPassword(password: String): Boolean {
-        return password.length >= 8
+        if (password.length < 8) return false
+        if(!password.any {it.isUpperCase()}) return false  //mayuscula
+        if(!password.any {it.isDigit()}) return false
+        return true
     }
 
     // ============================================
