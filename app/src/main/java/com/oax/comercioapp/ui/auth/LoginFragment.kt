@@ -10,6 +10,7 @@ import androidx.core.widget.addTextChangedListener
 import com.oax.comercioapp.R
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.navigation.fragment.findNavController
 import com.google.android.material.snackbar.Snackbar
 import com.oax.comercioapp.data.api.NetworkResult
 import com.oax.comercioapp.databinding.FragmentLoginBinding
@@ -138,6 +139,21 @@ class LoginFragment : Fragment() {
             Log.d(TAG, "-------------------")
             handleLoginClick()
         }
+
+        binding.buttonGuest.setOnClickListener {
+            Log.d(TAG, "-------------------------")
+            Log.d(TAG, "CLICK EN BOTÓN GUEST")
+            Log.d(TAG, "-------------------------")
+            navigateToHome()
+        }
+
+        binding.tvToRegister.setOnClickListener {
+            Log.d(TAG, "-------------------------")
+            Log.d(TAG, "CLICK EN LINK REGISTRARSE")
+            Log.d(TAG, "---------------------------")
+            navigateToRegister()
+        }
+
         Log.d(TAG, "Click listeners configurados")
     }
 
@@ -159,6 +175,7 @@ class LoginFragment : Fragment() {
         Log.i(TAG, "handleLoginClick() - Iniciando proceso de login")
 
         clearAllErrors()
+
         val email = binding.textEditEmail.text.toString().trim()
         val password = binding.textEditPassword.text.toString()
 
@@ -222,6 +239,32 @@ class LoginFragment : Fragment() {
             }
         }
     }
+
+    private fun navigateToHome() {
+        Log.i(TAG, "navigateToHome() - Navegando a Home")
+
+        try {
+            findNavController().navigate(R.id.navigation_home)
+            Log.d(TAG, "Navegación a Home exitosa")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al navegar a Home: ${e.message}", e)
+            Snackbar.make(binding.root, "Error de navegación", Snackbar.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun navigateToRegister() {
+        Log.i(TAG, "navigateToRegister() - Navegando a Register")
+
+        try {
+            findNavController().navigate(R.id.registerFragment)
+            Log.d(TAG, "Navegación a Register exitosa")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al navegar a Register: ${e.message}", e)
+            Snackbar.make(binding.root, "Error de navegación", Snackbar.LENGTH_SHORT).show()
+        }
+    }
+
+    // MÉTODOS AUXILIARES
 
     private fun clearAllErrors() {
         Log.v(TAG, "clearAllErrors() - Limpiando todos los errores")
