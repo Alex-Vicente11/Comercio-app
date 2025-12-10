@@ -9,5 +9,13 @@
   <color name="white">#FFFFFFFF</color>
 
 
-    <color name="green">#FF4CAF50</color>
+    <!-- Colores de estado (para Snackbars y feedback) -->
+    <color name="green">#FF4CAF50</color>           <!-- Success -->
+    <color name="red">#FFF44336</color>             <!-- Error -->
+    <color name="orange">#FFFF9800</color>          <!-- Warning -->
+    <color name="blue">#FF2196F3</color>            <!-- Info -->
+
+    <!-- Variantes (opcional) -->
+    <color name="green_dark">#FF388E3C</color>      <!-- Success dark -->
+    <color name="red_dark">#FFD32F2F</color>        <!-- Error dark -->
 </resources>
