@@ -95,12 +95,18 @@ class LoginFragment : Fragment() {
                     showLoading(false)
                     hideError()
 
-                    val message = getString(R.string.success_login)
-                    Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT)
-                        .setBackgroundTint(resources.getColor(R.color.green, null))
-                        .show()
-
+                    showSafeSnackbar(
+                        message = getString(R.string.success_login),
+                        duration = Snackbar.LENGTH_SHORT,
+                        backgroundColor = R.color.green
+                    )
                     Log.d(TAG, "Snackbar de éxito mostrado")
+
+                    // Navegar con pequeño delay para que se vea el Snackbar
+                    view?.postDelayed({
+                        navigateToHome()
+                    }, 500)
+
                 }
 
                 is NetworkResult.Error -> {
@@ -121,9 +127,11 @@ class LoginFragment : Fragment() {
 
             if (merged && count > 0) {
                 val message = "Carrito fusionado: $count productos agregados"
-                Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT)
-                    .setBackgroundTint(resources.getColor(R.color.green, null))
-                    .show()
+                showSafeSnackbar(
+                    message = message,
+                    duration = Snackbar.LENGTH_SHORT,
+                    backgroundColor = R.color.green
+                )
 
                 Log.i(TAG, "Snackbar de carrito fusionado mostrado")
             }
@@ -243,17 +251,39 @@ class LoginFragment : Fragment() {
     private fun navigateToHome() {
         Log.i(TAG, "navigateToHome() - Navegando a Home")
 
+        // verificación de seguridad
+        if (!isAdded) {
+            Log.w(TAG, "Fragment No está attached - abortando navegación")
+            return
+        }
+
+        if (view == null) {
+            Log.w(TAG, "View es NULL - abortando navegación")
+            return
+        }
+
         try {
             findNavController().navigate(R.id.navigation_home)
             Log.d(TAG, "Navegación a Home exitosa")
         } catch (e: Exception) {
             Log.e(TAG, "Error al navegar a Home: ${e.message}", e)
             Snackbar.make(binding.root, "Error de navegación", Snackbar.LENGTH_SHORT).show()
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Destino no encontrado: ${e.message}", e)
+            showSafeSnackbar("Error: Destino no encontrado")
+        } catch (e: IllegalStateException) {
+            Log.d(TAG, "NavController no disponible: ${e.message}", e)
+            showSafeSnackbar("Error de navegación")
         }
     }
 
     private fun navigateToRegister() {
         Log.i(TAG, "navigateToRegister() - Navegando a Register")
+
+        if (!isAdded || view == null) {
+            Log.w(TAG, "Fragment no esta listo - abortando navegación ")
+            return
+        }
 
         try {
             findNavController().navigate(R.id.registerFragment)
@@ -261,11 +291,44 @@ class LoginFragment : Fragment() {
         } catch (e: Exception) {
             Log.e(TAG, "Error al navegar a Register: ${e.message}", e)
             Snackbar.make(binding.root, "Error de navegación", Snackbar.LENGTH_SHORT).show()
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Destino no encontrado: ${e.message}", e)
+            showSafeSnackbar("Error: Destino no encontrado")
+        } catch (e: java.lang.IllegalStateException) {
+            Log.e(TAG, "NavController no disponible: ${e.message}", e)
+            showSafeSnackbar("Error de navegación")
         }
     }
 
     // MÉTODOS AUXILIARES
 
+    private fun showSafeSnackbar(
+        message: String,
+        duration: Int = Snackbar.LENGTH_SHORT,
+        backgroundColor: Int? = null
+    ) {
+        try {
+            // Verificar que el Fragment está en estado válido
+            if (_binding != null && isAdded && view != null) {
+                val snackbar = Snackbar.make(binding.root, message, duration)
+
+                // Aplicar color personalizado si se proporciona
+                backgroundColor?.let { colorRes ->
+                    snackbar.setBackgroundTint(resources.getColor(colorRes, null))
+                }
+
+                snackbar.show()
+                Log.d(TAG, "Snackbar mostrado: '$message' (duration: $duration)")
+            } else {
+                Log.w(TAG, "No se pudo mostrar Snackbar - Fragment no está listo")
+                Log.w(TAG, "- _binding null: ${_binding == null}")
+                Log.w(TAG, "- isAdded: $isAdded")
+                Log.w(TAG, "- view null: ${view == null}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mostrando Snackbar: ${e.message}", e)
+        }
+    }
     private fun clearAllErrors() {
         Log.v(TAG, "clearAllErrors() - Limpiando todos los errores")
         binding.textInputLayoutEmail.error = null
