@@ -249,7 +249,7 @@ class LoginFragment : Fragment() {
     }
 
     private fun navigateToHome() {
-        Log.i(TAG, "navigateToHome() - Navegando a Home")
+        Log.i(TAG, "navigateToHome() - Navegando a Cart")
 
         // verificación de seguridad
         if (!isAdded) {
@@ -263,8 +263,8 @@ class LoginFragment : Fragment() {
         }
 
         try {
-            findNavController().navigate(R.id.navigation_home)
-            Log.d(TAG, "Navegación a Home exitosa")
+            findNavController().navigate(R.id.navigation_cart)
+            Log.d(TAG, "Navegación a Cart exitosa")
         } catch (e: Exception) {
             Log.e(TAG, "Error al navegar a Home: ${e.message}", e)
             Snackbar.make(binding.root, "Error de navegación", Snackbar.LENGTH_SHORT).show()

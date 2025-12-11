@@ -1,4 +1,4 @@
-package com.oax.comercioapp.ui.home
+package com.oax.comercioapp.ui.cart
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -11,25 +11,23 @@ import com.oax.comercioapp.data.models.ProductResponse
 import com.oax.comercioapp.data.repository.ProductRepository
 import kotlinx.coroutines.launch
 
-class HomeViewModel(private val productRepository: ProductRepository = ProductRepository()) : ViewModel() {
+class CartProductsViewModel(private val productRepository: ProductRepository = ProductRepository()) : ViewModel() {
 
-  //private val productRepository = ProductRepository()
-  
   private val _products = MutableLiveData<NetworkResult<List<Product>>>()
   val products: LiveData<NetworkResult<List<Product>>> = _products
 
   private val _createProductResult = MutableLiveData<NetworkResult<ProductResponse>>()
   val createProductResult: LiveData<NetworkResult<ProductResponse>> = _createProductResult
-  
+
   private val _text = MutableLiveData<String>().apply {
-    value = "Productos"
+    value = "Cart"
   }
   val text: LiveData<String> = _text
-  
+
   init {
     loadProducts()
   }
-  
+
   fun loadProducts() {
     viewModelScope.launch {
       productRepository.getProducts().collect { result ->
@@ -45,7 +43,7 @@ class HomeViewModel(private val productRepository: ProductRepository = ProductRe
           }
       }
   }
-  
+
   fun refreshProducts() {
     loadProducts()
   }

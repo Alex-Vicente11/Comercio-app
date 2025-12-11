@@ -18,10 +18,10 @@
     tools:layout="@layout/fragment_login"/>
 
   <fragment
-      android:id="@+id/navigation_home"
-      android:name="com.oax.comercioapp.ui.home.HomeFragment"
-      android:label="@string/title_home"
-      tools:layout="@layout/fragment_home" />
+      android:id="@+id/navigation_cart"
+      android:name="com.oax.comercioapp.ui.cart.CartFragment"
+      android:label="@string/title_cart"
+      tools:layout="@layout/fragment_cart" />
 
   <fragment
       android:id="@+id/navigation_profiles"

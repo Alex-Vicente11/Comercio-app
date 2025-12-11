@@ -16,7 +16,7 @@ import com.oax.comercioapp.databinding.FragmentProfileBinding
 import java.lang.NumberFormatException
 import com.oax.comercioapp.R
 import com.oax.comercioapp.data.models.CartItemDetailed
-import com.oax.comercioapp.ui.home.CartViewModel
+import com.oax.comercioapp.ui.cart.CartViewModel
 
 class ProfileFragment : Fragment() {
 
