@@ -8,7 +8,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.oax.comercioapp.databinding.FragmentRegisterBinding
 
-class RegisterFragment: stFragment(){
+class RegisterFragment: Fragment(){
     private var _binding: FragmentRegisterBinding? = null
 
     override fun onCreateView(
