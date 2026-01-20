@@ -1,4 +1,4 @@
-package com.oax.comercioapp.ui.home
+package com.oax.comercioapp.ui.cart
 
 import android.os.Bundle
 import android.util.Log
@@ -16,14 +16,14 @@ import com.oax.comercioapp.data.models.CartItemDetailed
 import com.oax.comercioapp.data.models.Product
 import com.oax.comercioapp.data.models.ProductRequest
 import com.oax.comercioapp.databinding.DialogAddProductBinding
-import com.oax.comercioapp.databinding.FragmentHomeBinding
+import com.oax.comercioapp.databinding.FragmentCartBinding
 import com.oax.comercioapp.ui.adapters.ProductAdapter
 import com.oax.comercioapp.ui.adapters.ProductEvents
 import com.oax.comercioapp.utils.SessionManager
 
 
 /**
- * HomeFragment - Pantalla principal con lista de productos
+ * CartFragment - Pantalla principal con lista de productos y carrito
  *
  * CAMBIOS vs versión anterior:
  * - Ya NO pasa userId manualmente a CartViewModel
@@ -31,13 +31,13 @@ import com.oax.comercioapp.utils.SessionManager
  * - Observa cambios de sesión (guest y autenticado)
  * - Limpia carrito automáticamente al cerrar sesión
  */
-class HomeFragment : Fragment() {
+class CartFragment : Fragment() {
 
-  private var _binding: FragmentHomeBinding? = null
+  private var _binding: FragmentCartBinding? = null
   private val binding get() = _binding!!
-  
+
   private lateinit var productAdapter: ProductAdapter
-  private lateinit var homeViewModel: HomeViewModel
+  private lateinit var cartProductsViewModel: CartProductsViewModel
   private lateinit var cartViewModel: CartViewModel
 
   private var cartQuantities = mutableMapOf<Int, Int>()
@@ -50,10 +50,10 @@ class HomeFragment : Fragment() {
     container: ViewGroup?,
     savedInstanceState: Bundle?
   ): View {
-    homeViewModel = ViewModelProvider(this).get(HomeViewModel::class.java)
+    cartProductsViewModel = ViewModelProvider(this).get(CartProductsViewModel::class.java)
     cartViewModel = ViewModelProvider(this).get(CartViewModel::class.java)
 
-    _binding = FragmentHomeBinding.inflate(inflater, container, false)
+    _binding = FragmentCartBinding.inflate(inflater, container, false)
     val root: View = binding.root
 
     setupRecyclerView()
@@ -61,20 +61,20 @@ class HomeFragment : Fragment() {
     observeViewModel()
     observeCartViewModel()
     setupClickListeners()
-    
+
     return root
   }
 
 
   private fun setupSessionObserver() {
     SessionManager.currentUser.observe(viewLifecycleOwner) { user ->
-      Log.d("HomeFragment", "Session changed: ${user?.userName} (Guest: ${user?.isGuest}")
-      updateHomeTitle(user?.userName, user?.isGuest ?: false)
+      Log.d("CartFragment", "Session changed: ${user?.userName} (Guest: ${user?.isGuest}")
+      updateCartTitle(user?.userName, user?.isGuest ?: false)
 
       if (user != null && user.idUser > 0) {
         // solo recargar si cambio el usuario
         if (lastLoadedUserId != user.idUser){
-          Log.d("HomeFragment", "Usuario cambió de $lastLoadedUserId a ${user.idUser}, recargando carrito...")
+          Log.d("CartFragment", "Usuario cambió de $lastLoadedUserId a ${user.idUser}, recargando carrito...")
 
           // Limpiar cantidades anteriores
           cartQuantities.clear()
@@ -85,7 +85,7 @@ class HomeFragment : Fragment() {
           //cargar cantidades del nuevo usuario
           loadCartQuantities()
         }else {
-          Log.d("HomeFragment", "Mismo usuario, no se recarga carrito")
+          Log.d("CartFragment", "Mismo usuario, no se recarga carrito")
         }
       } else {
         //Usuario cerro sesion
@@ -109,22 +109,22 @@ class HomeFragment : Fragment() {
   }
 
   private fun clearCartQuantities() {
-    Log.d("HomeFragment", "Limpiando cantidades del carrito")
+    Log.d("CartFragment", "Limpiando cantidades del carrito")
     cartQuantities.clear()
     productAdapter.notifyDataSetChanged() // refrescar vista
   }
 
-  private fun updateHomeTitle(userName: String?, isGuest: Boolean) {
-    val baseTitle = "Productos"
+  private fun updateCartTitle(userName: String?, isGuest: Boolean) {
+    val baseTitle = "Cart"
     when {
       userName != null && isGuest -> {
-        binding.textHome.text = "$baseTitle\n Modo Invitado"
+        binding.textCart.text = "$baseTitle\n Modo Invitado"
       }
       userName != null -> {
-        binding.textHome.text = "$baseTitle\n Sesión: $userName"
+        binding.textCart.text = "$baseTitle\n Sesión: $userName"
       }
       else -> {
-        binding.textHome.text = "$baseTitle\n Inicia sesión para agregar al carrito"
+        binding.textCart.text = "$baseTitle\n Inicia sesión para agregar al carrito"
       }
     }
   }
@@ -185,15 +185,15 @@ class HomeFragment : Fragment() {
       adapter = productAdapter
     }
   }
-  
+
   private fun observeViewModel() {
-    homeViewModel.text.observe(viewLifecycleOwner) { vmText ->
+    cartProductsViewModel.text.observe(viewLifecycleOwner) { vmText ->
       if (!SessionManager.isLoggedIn()) {
-        binding.textHome.text = "$vmText\n Inicia sesión para usar el carrito"
+        binding.textCart.text = "$vmText\n Inicia sesión para usar el carrito"
       }
     }
-    
-    homeViewModel.products.observe(viewLifecycleOwner) { result ->
+
+    cartProductsViewModel.products.observe(viewLifecycleOwner) { result ->
       when (result) {
         is NetworkResult.Loading -> {
           binding.progressBar.visibility = View.VISIBLE
@@ -236,7 +236,7 @@ class HomeFragment : Fragment() {
 
           // Si es 401, la sesion ya fue cerrada por SessionManager
           if (result.code != 401) {
-            Log.e("HomeFragment", "Error al cargar carrito: ${result.message}")
+            Log.e("CartFragment", "Error al cargar carrito: ${result.message}")
           }
         }
         is NetworkResult.Loading -> {
@@ -301,7 +301,7 @@ class HomeFragment : Fragment() {
    * ACTUALIZADO: Recibe CartItemDetailed en lugar de CartItem
    */
   private fun updateCartQuantities(cartItems: List<CartItemDetailed>) {
-    Log.d("HomeFragment", "Actualizando cantidades del carrito...")
+    Log.d("CartFragment", "Actualizando cantidades del carrito...")
     // Limpiar cantidades anteriores
     cartQuantities.clear()
 
@@ -313,7 +313,7 @@ class HomeFragment : Fragment() {
     // Notificar al adapter para actualizar la vista
     productAdapter.notifyDataSetChanged()
 
-    Log.d("HomeFragment", "Vista actualizada con ${cartQuantities.size} productos en carrito")
+    Log.d("CartFragment", "Vista actualizada con ${cartQuantities.size} productos en carrito")
   }
   private fun setupClickListeners(){
     binding.fabAddProduct.setOnClickListener {
@@ -347,10 +347,10 @@ class HomeFragment : Fragment() {
         dialogBinding.buttonCancel.isEnabled = false
 
         // Crear producto
-        homeViewModel.createProduct(productRequest)
+        cartProductsViewModel.createProduct(productRequest)
 
         // Observar resultado de creacion
-        homeViewModel.createProductResult.observe(viewLifecycleOwner) { result ->
+        cartProductsViewModel.createProductResult.observe(viewLifecycleOwner) { result ->
           when (result) {
             is NetworkResult.Success -> {
               dialog.dismiss()
@@ -359,7 +359,7 @@ class HomeFragment : Fragment() {
                     "Producto agregado exitosamente",
                     Toast.LENGTH_SHORT
               ).show()
-              homeViewModel.refreshProducts()
+              cartProductsViewModel.refreshProducts()
             }
             is NetworkResult.Error -> {
                 dialogBinding.progressBarDialog.visibility = View.GONE
@@ -411,11 +411,11 @@ class HomeFragment : Fragment() {
 
     //
     val currentUser = SessionManager.getCurrentUser()
-    updateHomeTitle(currentUser?.userName, currentUser?.isGuest ?: false)
-    Log.d("HomeFragment", "onResume - Current user: ${currentUser?.userName} (Guest: ${currentUser?.isGuest}")
+    updateCartTitle(currentUser?.userName, currentUser?.isGuest ?: false)
+    Log.d("CartFragment", "onResume - Current user: ${currentUser?.userName} (Guest: ${currentUser?.isGuest}")
 
     if (currentUser == null || currentUser.idUser <= 0) {
-      Log.d("HomeFragment", "No hay usuario valido en onResume, limpiando carrito")
+      Log.d("CartFragment", "No hay usuario valido en onResume, limpiando carrito")
       lastLoadedUserId = null
       clearCartQuantities()
     }

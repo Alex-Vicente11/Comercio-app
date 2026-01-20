@@ -1,4 +1,4 @@
-package com.oax.comercioapp.ui.home
+package com.oax.comercioapp.ui.cart
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -514,16 +514,4 @@ class CartViewModel ( private val cartRepository: CartRepository = CartRepositor
             null
         }
     }
-
-    /**
-     * Resetea los resultados de operaciones
-     *
-     * Útil para limpiar mensajes de error/success después de mostrarlos
-     */
-    /*
-    fun clearOperationResults() {
-        _addToCartResult.value = null
-        _updateCartResult.value = null
-        _removeFromCartResult.value = null
-    }*/
 }

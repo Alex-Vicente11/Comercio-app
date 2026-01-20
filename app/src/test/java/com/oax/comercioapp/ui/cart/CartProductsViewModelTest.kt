@@ -1,4 +1,4 @@
-package com.oax.comercioapp.ui.home
+package com.oax.comercioapp.ui.cart
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.oax.comercioapp.data.api.NetworkResult
@@ -21,10 +21,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
-//import org.junit.jupiter.api.Assertions.*
-
 @ExperimentalCoroutinesApi
-class HomeViewModelTest {
+class CartProductsViewModelTest {
 
     // Regla para ejecutar LiveData de forma sincrona en tests
     @get:Rule
@@ -37,7 +35,7 @@ class HomeViewModelTest {
     private lateinit var productRepository: ProductRepository
 
     // ViewModel a testear
-    private lateinit var viewModel: HomeViewModel
+    private lateinit var viewModel: CartProductsViewModel
 
     @Before
     fun onBefore() {
@@ -48,7 +46,7 @@ class HomeViewModelTest {
         Dispatchers.setMain(testDispatcher)
 
         // Crear ViewModel con repositorio mock
-        viewModel = HomeViewModel(productRepository)
+        viewModel = CartProductsViewModel(productRepository)
     }
 
     @After
@@ -191,7 +189,7 @@ class HomeViewModelTest {
         val emptyResult = NetworkResult.Success(emptyList<Product>())
         coEvery { productRepository.getProducts() } returns flowOf(emptyResult)
 
-        val newViewModel = HomeViewModel(productRepository)
+        val newViewModel = CartProductsViewModel(productRepository)
 
         // ASSERT
         val result = newViewModel.products.value

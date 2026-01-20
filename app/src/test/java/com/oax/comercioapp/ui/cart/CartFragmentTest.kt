@@ -1,4 +1,4 @@
-package com.oax.comercioapp.ui.home
+package com.oax.comercioapp.ui.cart
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.oax.comercioapp.data.api.NetworkResult
@@ -20,7 +20,7 @@ import org.junit.Rule
 import org.junit.Test
 
 @ExperimentalCoroutinesApi
-class HomeFragmentTest {
+class CartFragmentTest {
 
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
@@ -452,10 +452,10 @@ class HomeFragmentTest {
 
     // =========  Test de formato de titulo ======
     @Test
-    fun `formatHomTitle - con usuario incluye nombre correctamente`() {
+    fun `formatCartTitle - con usuario incluye nombre correctamente`() {
         // ARRANGE
         val userName = "TestUser"
-        val baseTitle = "Productos"
+        val baseTitle = "Cart"
 
         // ACT
         val result = "$baseTitle\n Sesión: $userName"
@@ -467,10 +467,10 @@ class HomeFragmentTest {
     }
 
     @Test
-    fun formatHomeTitle_manejaNombresDeUsuarioEspeciales(){
+    fun formatCartTitle_manejaNombresDeUsuarioEspeciales(){
         // ARRANGE
         val userName = "Usuario@123"
-        val baseTitle = "Productos"
+        val baseTitle = "Cart"
 
         // ACT
         val result = "$baseTitle\n Sesión: $userName"
