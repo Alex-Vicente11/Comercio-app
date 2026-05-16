@@ -30,5 +30,3 @@ data class User(
     val isGuest: Boolean
 )
 
-class User {
-}
