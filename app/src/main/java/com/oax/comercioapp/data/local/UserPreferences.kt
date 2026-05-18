@@ -5,260 +5,139 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.oax.comercioapp.data.models.User
+import com.oax.comercioapp.domain.model.AuthResult
 import java.util.UUID
 
 /**
- * UserPreferences - Sistema de almacenamiento seguro con cifrado
+ * CAMBIOS RESPECTO AL ORIGINAL y sus razones:
+ *  1. YA NO ES 'object' - ahora es una clase normal inyectable
+ *     El original era 'object UserPreferences' (singleton estático)
+ *     Problema: los repositorios lo llamaban con UserPreferences.saveUser(...)
+ *     directamente, lo que hace imposible escribir tests unitarios
+ *     (no se puede ser reemplazado con un fake/mock).
+ *     Ahora se instancia una vez en el módulo de DI (Hilt) y se inyecta donde se necesite
+ *     - igual que ApiService.
+ *  2. saveUser(User) -> saveAuthResult(AuthResult)
+ *     El original recibía 'data.models.User' que tiene @SerializedName (acoplamiento a Gson/red).
+ *     Los repositorios ahora trabajan con AuthResult del dominio. Este cambio rompe ese acoplamiento.
+ *  3. Se agrega updateUserName() - métodoo específico que UserRepositoryImpl necesita después de
+ *     actualizar el perfil (solo cambia el nombre, no toda la sesión).
+ *  4. Se conserva la lógica de EncryptedSharedPreferences y la migración porque eso si esta bien
+ *     hecho y no tiene razon de cambio.
+ *  5. Los métodoss @Deprecated de compatibilidad se eliminan - ya no hay código que los llame una
+ *     vez que los Impl estén activos.
+ *  NOTA sobre 'init(context)':
+ *  El patrón cambia - ya no hay que llamar init() manualmente.
+ *  El Context se pasa al constructor y se inicializa en el momento de instanciación (en el módulo de DI).
+ *  Menos propenso a olvidar la llamada.
  *
- * Características:
- * - EncryptedSharedPreferences para datos sensibles (tokens, emails)
- * - Soporte para usuarios anónimos (guest users)
- * - Migración automática desde PreferencesManager
- * - Compatible con código existente
- * - Gestión de tokens JWT
- *
- * IMPORTANTE: Llamar a init(context) antes de usar cualquier método
  */
 
-object UserPreferences {
+class UserPreferences(context: Context) {
 
-    private const val TAG = "UserPreferences"
+    private val appContext = context.applicationContext // Evitar memory leak con Activity context
 
-    // Nombre del archivo cifrado
-    private const val PREFS_NAME = "user_secure_prefs"
+    companion object {
+        private const val TAG = "UserPreferences"
 
-    // Keys para datos de usuario
-    private const val KEY_USER_ID = "user_id"
-    private const val KEY_USER_NAME = "user_name"
-    private const val KEY_EMAIL = "email"
-    private const val KEY_AUTH_TOKEN = "auth_token"
-    private const val KEY_GUEST_ID = "guest_id"
-    private const val KEY_IS_GUEST = "is_guest"
-    private const val KEY_LOGIN_TIMESTAMP = "login_timestamp"
+        // Nombre del archivo cifrado
+        private const val PREFS_NAME = "user_secure_prefs"
 
-    // Key para controlar migracion
-    private const val KEY_MIGRATED = "migrated_from_old_prefs"
+        // Keys para datos de usuario
+        private const val KEY_USER_ID = "user_id"
+        private const val KEY_USER_NAME = "user_name"
+        private const val KEY_EMAIL = "email"
+        private const val KEY_AUTH_TOKEN = "auth_token"
+        private const val KEY_GUEST_ID = "guest_id"
+        private const val KEY_IS_GUEST = "is_guest"
+        private const val KEY_LOGIN_TIMESTAMP = "login_timestamp"
 
-    // SharedPreferences cifrado
-    private lateinit var prefs: SharedPreferences
+        // Key para controlar migracion
+        private const val KEY_MIGRATED = "migrated_from_old_prefs"
+    }
 
-    // Flag de inicializacion
-    private var isInitialized = false
-
-
-    // INICIALIZACIÓN
-    // ============================================
     /**
-     * Inicializa UserPreferences con EncryptedSharedPreferences
-     *
-     * DEBE llamarse en onCreate() de MainActivity o Application class
-     *
-     * a@param context Contexto de la aplicación
+     * SharedPreferences inicializando de forma lazy.
+     * Se crea al primer acceso, no en el constructor.
+     * Si falla el cifrado, cae al fallback sin cifrar (mismo comportamiento que antes).
      */
-
-    fun init (context: Context) {
-        if (isInitialized) {
-            Log.d(TAG, "Ya está inicializado")
-        }
-
+    // SharedPreferences cifrado
+    private val prefs: SharedPreferences by lazy {
         try {
-            Log.d(TAG, "Inicializando UserPreferences con cifrado..")
-
-            // Crear MasterKey para cifrado AES256
-            val masterKey = MasterKey.Builder(context)
+            val masterKey = MasterKey.Builder(appContext)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
 
-            prefs = EncryptedSharedPreferences.create(
-                context,
+            EncryptedSharedPreferences.create(
+                appContext,
                 PREFS_NAME,
                 masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-
-            isInitialized = true
-            Log.d(TAG, "Inicializacion exitosa")
-
-            // Migrar datos antiguos si es primera vez
-            migrateFromOldPreferences(context)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al inicializar ${e.message}", e)
-
-            // Fallback a SharedPreferences normal si falla el cifrado
-            Log.w(TAG, "Usando SharedPreferences sin cifrado como fallback")
-            prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            isInitialized = true
+            ).also {
+                Log.d(TAG, "EncryptedSharedPreferences inicializando correctamente")
+                migrateFromOldPreferences()
+            }
+        }catch (e: Exception) {
+            Log.e(TAG, "Error al inicializar cifrado, usando fallback: ${e.message}")
+            appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         }
     }
 
-    // GESTIÓN DE GUEST ID
-    // ============================================
-
+    // --- Gestión de sesión ---
     /**
-     * Obtiene el guest_id actual o crea uno nuevo
+     * Guarda el resultado de autenticación (login, register, guest).
      *
-     * Formato: guest_{UUID}_{timestamp}
-     * Ejemplo: guest_a1b2c3d4-e5f6-7890-abcd-ef1234567890_1699123456789
+     * CAMBIO CLAVE: recibe AuthResult (dominio) en vez de User (data.models).
+     * Esto rompe el acoplamiento entre la capa local y los modelos de red.
+     * Si la estructura de User en data.models cambia, este métodoo no se entera.
      *
-     * a@return guest_id único
+     * El token puede ser vacío ("") para usuarios guest - se guarda null
+     * en ese caso para mantener consistencia con getAuthToken() retornando null
      */
-
-    fun getOrCreateGuestId(): String {
-        checkInitialized()
-
-        var guestId = prefs.getString(KEY_GUEST_ID, null)
-
-        if (guestId == null) {
-            guestId = "guest_${UUID.randomUUID()}_${System.currentTimeMillis()}"
-            prefs.edit().putString(KEY_GUEST_ID, guestId).apply()
-            Log.d(TAG, "Guest ID creado: $guestId")
-        } else {
-            Log.d(TAG, "Guest ID existente: $guestId")
-        }
-
-        return guestId
-    }
-
-    /**
-     * Limpia el guest_id (se usa después de registro/login)
-     */
-
-    fun clearGuestId() {
-        checkInitialized()
-        prefs.edit().remove(KEY_GUEST_ID).apply()
-        Log.d(TAG, "Guest ID eliminado")
-    }
-
-    // GESTIÓN DE USUARIO
-    // ============================================
-    /**
-     * Guarda los datos del usuario actual
-     *
-     * a@param user Usuario a guardar (puede ser guest o autenticado)
-     */
-
-    fun saveUser (user: User) {
-        checkInitialized()
-
+    fun saveAuthResult(authResult: AuthResult) {
         try {
             prefs.edit().apply {
-                putInt(KEY_USER_ID, user.idUser)
-                putString(KEY_USER_NAME, user.userName)
-                putString(KEY_EMAIL, user.email)
-                putString(KEY_AUTH_TOKEN, user.token)
-                putBoolean(KEY_IS_GUEST, user.isGuest)
+                putInt(KEY_USER_ID, authResult.userId)
+                putString(KEY_USER_NAME, authResult.userName)
+                putString(KEY_EMAIL, authResult.email)
+                putString(KEY_AUTH_TOKEN, authResult.token.ifEmpty { null })
+                putBoolean(KEY_IS_GUEST, authResult.isGuest)
                 putLong(KEY_LOGIN_TIMESTAMP, System.currentTimeMillis())
                 apply()
             }
 
-            // Limpiar guest_id si ya no es guest
-            if (!user.isGuest) {
-                clearGuestId()
-            }
+            // Si se autenticó, ya no necesitamos el guest_id
+            if (!authResult.isGuest) clearGuestId()
 
-            val userType = if (user.isGuest) "GUEST" else "AUTHENTICATED"
-            Log.d(TAG, " Usuario guardado: ${user.userName} (ID: ${user.idUser}) - Tipo: $userType")
+            val type = if (authResult.isGuest) "GUEST" else "AUTENTICADO"
+            Log.d(TAG, "Sesión guardada: ${authResult.userName} - $type")
         } catch (e: Exception) {
-            Log.e(TAG, "Error al guardar usuario: ${e.message}", e)
+            Log.e(TAG, "Error al guardar sesión: ${e.message}", e)
         }
     }
 
     /**
-     * Obtiene el ID del usuario actual
-     *
-     *a @return ID del usuario, o 0 si no hay usuario
+     * Actualiza solo el nombre de usuario, sin tocar el resto de la sesión.
+     * Usado por UserRepositoryImpl.updateProfile() - el servidor confirma el nuevo nombre y
+     * solo actualizamos ese campo localmente.
      */
-
-    fun getUserId(): Int {
-        checkInitialized()
-        return prefs.getInt(KEY_USER_ID, 0)
-    }
-
-    /**
-     * Obtiene el nombre del usuario actual
-     *
-     * a@return Nombre del usuario, o null si no hay usuario
-     */
-    fun getUserName(): String? {
-        checkInitialized()
-        return prefs.getString(KEY_USER_NAME, null)
-    }
-
-    /**
-     * Obtiene el email del usuario actual
-     *
-     *a @return Email del usuario, o null si es guest o no hay usuario
-     */
-    fun getEmail(): String? {
-        checkInitialized()
-        return prefs.getString(KEY_EMAIL, null)
-    }
-
-    /**
-     * Obtiene el token JWT del usuario autenticado
-     *
-     * a@return Token JWT, o null si es guest o no hay token
-     */
-
-    fun getAuthToken(): String? {
-        checkInitialized()
-        val token = prefs.getString(KEY_AUTH_TOKEN, null)
-
-        if (token != null) {
-            Log.d(TAG,"Token encontrado (${token.take(20)}...")
-        } else {
-            Log.d(TAG,"No hay token")
+    fun updateUserName(newUserName: String) {
+        try {
+            prefs.edit().putString(KEY_USER_NAME, newUserName).apply()
+            Log.d(TAG, "Nombre actualizado: $newUserName")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al actualizar nombre: ${e.message}", e)
         }
-
-        return token
     }
 
     /**
-     * Verifica si el usuario actual es guest
-     *
-     * @return true si es guest, false si es autenticado o no hay usuario
-     */
-    fun isGuest(): Boolean {
-        checkInitialized()
-        return prefs.getBoolean(KEY_IS_GUEST, true)
-    }
-
-    /**
-     * Verifica si hay una sesión activa (guest o autenticado)
-     *
-     * @return true si hay usuario logueado
-     */
-    fun isLoggedIn(): Boolean {
-        checkInitialized()
-        val userId = getUserId()
-        val isLoggedIn = userId > 0
-
-        Log.d(TAG, "¿Sesión activa? $isLoggedIn (UserID: $userId)")
-        return isLoggedIn
-    }
-
-    /**
-     * Obtiene el timestamp del último login
-     *
-     * @return Timestamp en milisegundos, o 0 si no hay login
-     */
-    fun getLoginTimestamp(): Long {
-        checkInitialized()
-        return prefs.getLong(KEY_LOGIN_TIMESTAMP, 0L)
-    }
-
-    /**
-     * Limpia todos los datos del usuario actual
-     *
-     * NOTA: NO limpia el guest_id, solo los datos de sesión
+     * Limpia los datos de la sesión del usuario actual.
+     * NO limpia el guest_id - se conserva para que el siguiente
+     * usuario guest de este dispositivo tenga continuidad de carrito
      */
     fun clearUser() {
-        checkInitialized()
-
         val userName = getUserName()
-
         prefs.edit().apply {
             remove(KEY_USER_ID)
             remove(KEY_USER_NAME)
@@ -268,236 +147,128 @@ object UserPreferences {
             remove(KEY_LOGIN_TIMESTAMP)
             apply()
         }
-
-        Log.d(TAG, "Usuario limpiado: $userName")
+        Log.d(TAG, "Sesión limpiada: $userName")
     }
 
     /**
-     * Limpia TODOS los datos incluyendo guest_id
-     *
-     * USAR CON CUIDADO: Limpia toda la información de sesión
+     * Limpia absolutamente todoo, incluyendo guest_id- Usar en desinstalación/reset.
      */
     fun clearAll() {
-        checkInitialized()
         prefs.edit().clear().apply()
         Log.d(TAG, "Todas las preferencias limpiadas")
     }
 
-    // MIGRACIÓN DE DATOS
-    // ============================================
+    // -- Getters de sesión ---
+
+    fun getUserId(): Int = prefs.getInt(KEY_USER_ID, 0)
+    fun getUserName(): String? = prefs.getString(KEY_USER_NAME, null)
+    fun getEmail(): String? = prefs.getString(KEY_EMAIL, null)
+    fun isGuest(): Boolean = prefs.getBoolean(KEY_IS_GUEST, true)
+    fun getLoginTimestamp(): Long = prefs.getLong(KEY_LOGIN_TIMESTAMP, 0L)
+
+    fun getAuthToken(): String? {
+        val token = prefs.getString(KEY_AUTH_TOKEN, null)
+        Log.d(TAG, if (token != null) "Token encontrado (${token.take(20)}...)" else "Sin token")
+        return token
+    }
+
     /**
-     * Migra datos desde PreferencesManager (sistema antiguo)
-     *
-     * Solo se ejecuta una vez, en la primera inicialización
+     * Hay sesión activa si hay un userId válido guardado.
+     * Aplica tanto a usuarios autenticados como guests con userId asignado
      */
+    fun isLoggedIn(): Boolean {
+        val userId = getUserId()
+        return (userId > 0).also {
+            Log.d(TAG, "¿Sesión activa? $it (userId = $userId")
+        }
+    }
 
-    private fun migrateFromOldPreferences(context: Context) {
+    // --- Gestión de Guest ID ---
+    /**
+     * Obtiene el guest_id existente o genera uno nuevo
+     * Formato: guest_{UUID}_{timestamp}
+     */
+    fun getOrCreateGuestId(): String {
+        return prefs.getString(KEY_GUEST_ID, null) ?: run {
+            val newId = "guest_${UUID.randomUUID()}_${System.currentTimeMillis()}"
+            prefs.edit().putString(KEY_GUEST_ID, newId).apply()
+            Log.d(TAG, "Guest ID creado: $newId")
+            newId
+        }
+    }
+
+    fun clearGuestId() {
+        prefs.edit().remove(KEY_GUEST_ID).apply()
+        Log.d(TAG, "Guest ID eliminado")
+    }
+
+    // --- Expiración de token ---
+    /**
+     * Verificación local de expiración basada en timestamp de login.
+     * No reemplaza la validación real del servidor (validateToken()),
+     * sirve como check rápido antes de hacer llamdas de red.
+     */
+    fun isTokenExpiredLocally(maxAgeHours: Int = 24): Boolean {
+        val token = getAuthToken() ?: return true
+        val loginTime = getLoginTimestamp()
+        if (loginTime == 0L) return true
+        val elapsedHours = (System.currentTimeMillis() - loginTime) / (1000 * 60 * 60)
+        return elapsedHours > maxAgeHours
+    }
+
+    // --- Migración ---
+    /**
+     * Migra datos desde PreferencesManager (sistema antiguo).
+     * Se llama automáticamente una solo vez al crear la instancia.
+     * Conservada del original - la lógica de migración estaba bien.
+     */
+    private fun migrateFromOldPreferences() {
         try {
-            // Verificar si ya se migró
-            if (prefs.getBoolean(KEY_MIGRATED, false)) {
-                Log.d(TAG, "Migración ya ejecutada anteriormente")
-                return
-            }
+            if (prefs.getBoolean(KEY_MIGRATED, false)) return
 
-            Log.d(TAG, "Iniciando migración desde PreferencesManager...")
+            Log.d(TAG, "Verificando migración desde PreferencesManager...")
+            val oldPrefs = appContext.getSharedPreferences("comercio_app_prefs", Context.MODE_PRIVATE)
 
-            // Leer datos antiguos
-            val oldPrefs = context.getSharedPreferences("comercio_app_prefs", Context.MODE_PRIVATE)
-            val hasOldSession = oldPrefs.getBoolean("is_logged_in", false)
-
-            if (hasOldSession) {
+            if (oldPrefs.getBoolean("is_logged_in", false)) {
                 val oldUserId = oldPrefs.getInt("user_id", 0)
                 val oldUserName = oldPrefs.getString("user_name", null)
-                val oldLoginTimestamp = oldPrefs.getLong("login_timestamp", 0L)
+                val oldTimestamp = oldPrefs.getLong("login_timestamp", 0L)
 
                 if (oldUserId > 0 && oldUserName != null) {
-                    Log.d(TAG, "Datos antiguos encontrados: $oldUserName (ID: $oldUserId)")
-
-                    // Migrar a nuevo sistema
                     prefs.edit().apply {
                         putInt(KEY_USER_ID, oldUserId)
                         putString(KEY_USER_NAME, oldUserName)
                         putBoolean(KEY_IS_GUEST, false)
-                        putLong(KEY_LOGIN_TIMESTAMP, oldLoginTimestamp)
+                        putLong(KEY_LOGIN_TIMESTAMP, oldTimestamp)
                         putBoolean(KEY_MIGRATED, true)
                         apply()
                     }
-
                     Log.d(TAG, "Migración exitosa: $oldUserName")
                 } else {
-                    Log.d(TAG, "Datos antiguos inválidos, saltando migración")
                     prefs.edit().putBoolean(KEY_MIGRATED, true).apply()
                 }
             } else {
-                Log.d(TAG, "No hay sesión antigua para migrar")
                 prefs.edit().putBoolean(KEY_MIGRATED, true).apply()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error en migración: ${e.message}", e)
-            // Marcar como migrado para no reintentar
             prefs.edit().putBoolean(KEY_MIGRATED, true).apply()
         }
     }
 
-
-    // ====================
-    // UTILIDADES DE DEBUG
-    // ====================
+    // Debug
     /**
-     * Obtiene información completa de la sesión actual
-     *
-     * .@return String con todos los datos de sesión (útil para debugging)
+     * Solo para debugging - no expone valores sensibles.
+     * Llamar desde un Fragment/Activity en builds de debug.
      */
-
-    fun getSessionDebugInfo(): String {
-        checkInitialized()
-
-        val userId = getUserId()
-        val userName = getUserName()
-        val email = getEmail()
-        val isGuest = isGuest()
-        val hasToken = getAuthToken() != null
-        val loginTime = getLoginTimestamp()
-
-        val loginTimeFormatted = if (loginTime > 0) {
-            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.getDefault())
-                .format(java.util.Date(loginTime))
-        } else {
-            "N/A"
-        }
-
-        return buildString {
-            append("=== SESIÓN ACTUAL === \n")
-            append("=== SESIÓN ACTUAL ===\n")
-            append("User ID: $userId\n")
-            append("Nombre: ${userName ?: "N/A"}\n")
-            append("Email: ${email ?: "N/A"}\n")
-            append("Tipo: ${if (isGuest) "GUEST" else "AUTENTICADO"}\n")
-            append("Token: ${if (hasToken) "SÍ" else "NO"}\n")
-            append("Login: $loginTimeFormatted\n")
-
-            if (isGuest) {
-                val guestId = prefs.getString(KEY_GUEST_ID, null)
-                append("Guest ID: ${guestId ?: "No generado"}\n")
-
-            }
-        }
-    }
-
-
-    /**
-     * Obtiene todas las preferencias guardadas
-     *
-     *  Solo para debugging, no expone valores sensibles
-     */
-
-    fun getAllPreferencesDebug(): String {
-        checkInitialized()
-
-        return buildString {
-            append("=== PREFERENCIAS GUARDADAS ===\n")
-            append("User ID: ${getUserId()}\n")
-            append("User Name: ${getUserName() ?: "N/A"}\n")
-            append("Email: ${if (getEmail() != null) "***@***.***" else "N/A"}\n")
-            append("Is Guest: ${isGuest()}\n")
-            append("Has Token: ${getAuthToken() != null}\n")
-            append("Logged In: ${isLoggedIn()}\n")
-            append("Migrated: ${prefs.getBoolean(KEY_MIGRATED, false)}\n")
-        }
-    }
-
-    /**
-     * Verifica si el token ha expirado (opcional)
-     *
-     * .@param maxAgeHours Edad máxima del token en horas (default: 24)
-     * .@return true si el token ha expirado o no existe
-     */
-
-    fun isTokenExpired(maxAgeHours: Int = 24): Boolean {
-        checkInitialized()
-
-        val token = getAuthToken()
-        if (token == null) return true
-
-        val loginTime = getLoginTimestamp()
-        if (loginTime == 0L) return true
-
-        val currentTime = System.currentTimeMillis()
-        val elapsedHours = (currentTime - loginTime) / (1000 * 60 * 60)
-
-        return elapsedHours > maxAgeHours
-    }
-
-
-    // ===================
-    // VALIDACIÓN INTERNA
-    // ===================
-
-    /**
-     * Verifica que UserPreferences esté inicializado
-     *
-     * .@throws IllegalStateException si no está inicializado
-     */
-
-    private fun checkInitialized() {
-        if (!isInitialized) {
-            throw IllegalStateException(
-                "UserPreferences no está inicializado. " +
-                "Llamar UserPreferences.init(context) antes de usar."
-            )
-        }
-    }
-
-    // ============================================
-    // COMPATIBILIDAD CON CÓDIGO EXISTENTE
-    // ============================================
-
-    /**
-     * Guarda sesión de usuario (compatibilidad con PreferencesManager)
-     *
-     * .@deprecated Usar saveUser(User) en su lugar
-     */
-    @Deprecated(
-        message = "Usar saveUser(User) para tener todos los datos",
-        replaceWith = ReplaceWith("saveUser(User(userId, userName))"),
-        level = DeprecationLevel.WARNING
-    )
-    fun saveUserSession(userId: Int, userName: String) {
-        checkInitialized()
-        saveUser(User(
-            idUser = userId,
-            userName = userName,
-            email = null,
-            isGuest = false,
-            token = null
-        ))
-    }
-
-    /**
-     * Limpia sesión de usuario (compatibilidad con PreferencesManager)
-     *
-     * @deprecated Usar clearUser() en su lugar
-     */
-    @Deprecated(
-        message = "Usar clearUser() en su lugar",
-        replaceWith = ReplaceWith("clearUser()"),
-        level = DeprecationLevel.WARNING
-    )
-    fun clearUserSession() {
-        clearUser()
-    }
-
-    /**
-     * Verifica sesión activa (compatibilidad con PreferencesManager)
-     *
-     * @deprecated Usar isLoggedIn() en su lugar
-     */
-    @Deprecated(
-        message = "Usar isLoggedIn() en su lugar",
-        replaceWith = ReplaceWith("isLoggedIn()"),
-        level = DeprecationLevel.WARNING
-    )
-    fun hasActiveSession(): Boolean {
-        return isLoggedIn()
+    fun getSessionDebugInfo(): String = buildString {
+        append("=== SESIÓN ACTUAL ===\n")
+        append("User ID: ${getUserId()}\n")
+        append("Nombre: ${getUserName() ?: "N/A"}\n")
+        append("Email: ${getEmail()?.replace(Regex(".(?=.*@)"), "*") ?: "N/A"}\n")
+        append("Tipo: ${if (isGuest()) "GUEST" else "AUTENTICADO"}\n")
+        append("Token: ${if (getAuthToken() != null) "SÍ" else "NO"}\n")
+        append("Expirado (local): ${isTokenExpiredLocally()}\n")
+        if (isGuest()) append("Guest ID: ${prefs.getString(KEY_GUEST_ID, "No generado")}\n")
     }
 }
