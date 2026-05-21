@@ -1,98 +1,101 @@
 package com.oax.comercioapp.ui.auth
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.oax.comercioapp.data.api.NetworkResult
-import com.oax.comercioapp.data.local.UserPreferences
-import com.oax.comercioapp.data.models.AuthResponse
-import com.oax.comercioapp.data.models.GuestCreateResponse
-import com.oax.comercioapp.data.models.User
-import com.oax.comercioapp.data.repository.AuthRepository
-import com.oax.comercioapp.utils.SessionManager
-import com.oax.comercioapp.utils.SessionManager.logout
+import com.oax.comercioapp.domain.model.AuthResult
+import com.oax.comercioapp.domain.usecase.CreateGuestSessionUseCase
+import com.oax.comercioapp.domain.usecase.LoginUseCase
+import com.oax.comercioapp.domain.usecase.LogoutUseCase
+import com.oax.comercioapp.domain.usecase.RegisterUseCase
+import com.oax.comercioapp.domain.usecase.ValidateSessionUseCase
+import com.oax.comercioapp.ui.UiState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * AuthViewModel - ViewModel para autenticación de usuarios
+ * CAMBIOS RESPECTO AL ORIGINAL:
+ * 1. LiveData -> StateFlow
+ *    LiveData requiere un Observer con ciclo de vida de Android - no es testeable sin un emulador.
+ *    StateFlow es kotlin puro: el Fragment lo colecta con lifecycleScope. el test lo colecta directamente.
+ *    Mismo comporatamientp, mejor testeabilidad.
  *
- * Funcionalidades:
- * - Crear usuarios guest
- * - Registro con email/password
- * - Login con fusión automática de carrito
- * - Validación de tokens JWT
- * - Logout
+ * 2. NetworkResult -> UiState
+ *    El ViewModel ya no sabe que los datos vienen de una red. Solo sabe que una operación puede estar en
+ *    Loading, Success o Error. Si después login se hace con biometría o con caché local, el fragment no cambia nada.
+ *
+ * 3. AuthRepository -> Use Cases inyectados
+ *    Antes: authRepository.login(email, password).collect { ... }
+ *    Ahora: loginUseCase(email, password)
+ *    El ViewModel ya no construye objetos User, no llama a SessionManager, no obtiene guestId -
+ *    todoo eso lo hace el use case.
+ *
+ * 4. Se elimina SessionManager del ViewModel
+ *    SessionManager era un singleton estático que el ViewModel llamaba directamente. Con los use cases,
+ *    el repositorio ya guarda la sesión en UserPreferences.
+ *
+ * 5. Estados separados por operación
+ *    loginState, registerState, guestState separados - así el Fragment puede reaccionar a cada uno sin
+ *    ambigüedad. Un solo _authState compartido causaría confusión si login y register compiten.
+ *
+ * 6. cartMergeInfo eliminado del ViewModel
+ *    Era un Pair<Boolean, Int> que comunicaba si el carrito migró.
+ *    Con el nuevo enfoque de app de pedidos, después del login la app simplemente recarga el
+ *    carrito actual - no necesita saber su hubo merge. Esa información es un detalle de infraestructura
+ *    que no sube a la UI.
  */
 
-
-
 class AuthViewModel(
-    private val authRepository: AuthRepository = AuthRepository()
+    private val loginUseCase: LoginUseCase,
+    private val registerUseCase: RegisterUseCase,
+    private val validateSessionUseCase: ValidateSessionUseCase,
+    private val createGuestSessionUseCase: CreateGuestSessionUseCase,
+    private val logoutUseCase: LogoutUseCase
 ): ViewModel() {
 
     // Estado de creacion de guest
-    private val _guestCreateState = MutableLiveData<NetworkResult<GuestCreateResponse>>()
-    val guestCreateRequest: LiveData<NetworkResult<GuestCreateResponse>> = _guestCreateState
+    private val _guestState = MutableStateFlow<UiState<AuthResult>>(UiState.Idle)
+    val guestState: StateFlow<UiState<AuthResult>> = _guestState.asStateFlow()
 
     // Estado de registro
-    private val _registerState = MutableLiveData<NetworkResult<AuthResponse>>()
-    val registerState: LiveData<NetworkResult<AuthResponse>> = _registerState
+    private val _registerState = MutableStateFlow<UiState<AuthResult>>(UiState.Idle)
+    val registerState: StateFlow<UiState<AuthResult>> = _registerState.asStateFlow()
 
     // Estado de login
-    private val _loginState = MutableLiveData<NetworkResult<AuthResponse>>()
-    val loginState: LiveData<NetworkResult<AuthResponse>> = _loginState
+    private val _loginState = MutableStateFlow<UiState<AuthResult>>(UiState.Idle)
+    val loginState: StateFlow<UiState<AuthResult>> = _loginState.asStateFlow()
 
-    // Estado de validacion de token
-    private val _tokenValidationState = MutableLiveData<NetworkResult<Boolean>>()
-    val tokenValidationState: LiveData<NetworkResult<Boolean>> = _tokenValidationState
+    /**
+     * Estado de validación de sesión - Boolean indica si la sesión es válida.
+     * El Fragment observa esto al iniciar para decidir si navegar al login o al home.
+     */
+    private val _sessionState = MutableStateFlow<UiState<Boolean>>(UiState.Idle)
+    val sessionState: StateFlow<UiState<Boolean>> = _sessionState.asStateFlow()
 
-    // Informacion de fusion de carrito
-    private val _cartMergeInfo = MutableLiveData<Pair<Boolean, Int>>()
-    val cartMergeInfo: LiveData<Pair<Boolean, Int>> = _cartMergeInfo
-
-
-    // ============================================
-    // GUEST USER CREATION
-    // ============================================
+    // OPERACIONES
 
     /**
      * Crea un usuario guest en el backend
      *
      * Se debe llamar al iniciar la app si no hay sesión
      */
-    fun createGuestUser() {
+    fun createGuestSession() {
         viewModelScope.launch {
-            authRepository.createGuestUser().collect { result ->
-                when (result) {
-                    is NetworkResult.Success -> {
-                        // Guest creado, guardar en SessionManager
-                        val guestUser = User(
-                            idUser = result.data.userId,
-                            userName = "Guest User",
-                            email = null,
-                            isGuest = true,
-                            token = null
-                        )
-                        SessionManager.login(guestUser)
-                        _guestCreateState.postValue(result)
-                    }
+            _guestState.value = UiState.Loading
 
-                    is NetworkResult.Error -> {
-                        _guestCreateState.postValue(result)
-                    }
-
-                    is NetworkResult.Loading -> {
-                        _guestCreateState.postValue(result)
-                    }
+            createGuestSessionUseCase()
+                .onSuccess { authResult ->
+                    _guestState.value = UiState.Success(authResult)
                 }
-            }
+
+                .onFailure { error ->
+                    _guestState.value = UiState.Error(
+                        error.message ?: "Error al crear sesión de invitado"
+                    )
+                }
         }
     }
-
-    // ============================================
-    // REGISTRO DE USUARIOS
-    // ============================================
 
     /**
      * Registra un nuevo usuario con email y password
@@ -103,63 +106,21 @@ class AuthViewModel(
      */
 
     fun register(email: String, password: String, userName: String) {
-        // validacion basica
-        if (!isValidEmail(email)) {
-            _registerState.postValue(NetworkResult.Error("Email invalido"))
-            return
-        }
-
-        if (!isValidPassword(password)) {
-            _registerState.postValue(NetworkResult.Error("Contraseña debe tener al menos 8 caracteres"))
-            return
-        }
-
-        if (userName.trim().isEmpty()) {
-            _registerState.postValue(NetworkResult.Error("Nombre de usuario requerido"))
-            return
-        }
-
         viewModelScope.launch {
-            authRepository.register(email, password, userName).collect { result ->
-                when (result) {
-                    is NetworkResult.Success -> {
-                        val response = result.data
+            _registerState.value = UiState.Loading
 
-                        // Crear usuario autenticado
-                        val authenticatedUser = User (
-                            idUser = response.userId ?: 0,
-                            userName = response.userName ?: userName,
-                            email = response.email,
-                            isGuest = false,
-                            token = response.token
-                        )
-
-                        // Actualizar SessionManager
-                        SessionManager.login(authenticatedUser)
-
-                        // Informacion de merge de carrito
-                        if (response.cartMigrated) {
-                            _cartMergeInfo.postValue(Pair(true, response.cartItemsCount))
-                        }
-
-                        _registerState.postValue(result)
-                    }
-
-                    is NetworkResult.Error -> {
-                        _registerState.postValue(result)
-                    }
-
-                    is NetworkResult.Loading -> {
-                        _registerState.postValue(result)
-                    }
+            registerUseCase(email, password, userName)
+                .onSuccess { authResult ->
+                    _registerState.value = UiState.Success(authResult)
                 }
-            }
+
+                .onFailure { error ->
+                    _registerState.value = UiState.Error(
+                    error.message ?: "Error al registrar usuario"
+                    )
+                }
         }
     }
-
-    // ============================================
-    // LOGIN DE USUARIOS
-    // ============================================
 
     /**
      * Inicia sesión con email y password
@@ -169,104 +130,46 @@ class AuthViewModel(
      */
 
     fun login(email: String, password: String) {
-        // Validacion basica
-        if (!isValidEmail(email)) {
-            _loginState.postValue(NetworkResult.Error("Email inválido"))
-            return
-        }
-
-        if (password.isEmpty()) {
-            _loginState.postValue(NetworkResult.Error("Contraseña requerida"))
-            return
-        }
-
         viewModelScope.launch {
-            authRepository.login(email, password).collect { result ->
-                when (result) {
-                    is NetworkResult.Success -> {
-                        val response = result.data
+            _loginState.value = UiState.Loading
 
-                        // Crear usuario autenticado
-
-                        val authenticatedUser = User(
-                            idUser = response.userId ?: 0,
-                            userName = response.userName ?: "",
-                            email = response.email,
-                            isGuest = false,
-                            token = response.token
-                        )
-
-                        // Actualizar SessionManager
-                        SessionManager.login(authenticatedUser)
-
-                        // Informacion de merge de carrito
-                        if (response.cartMigrated) {
-                            _cartMergeInfo.postValue(Pair(true, response.cartItemsCount))
-                        }
-
-                        _loginState.postValue(result)
-                    }
-
-                    is NetworkResult.Error -> {
-                        _loginState.postValue(result)
-                    }
-
-                    is NetworkResult.Loading -> {
-                        _loginState.postValue(result)
-                    }
+            loginUseCase(email, password)
+                .onSuccess { authResult ->
+                    _loginState.value = UiState.Success(authResult)
                 }
-            }
+
+                .onFailure { error ->
+                    // El use case ya traduce los errores técnicos a mensajes legibles
+                    _loginState.value = UiState.Error(
+                        error.message ?: "Error al iniciar sesión"
+                    )
+                }
         }
     }
-
-    // ============================================
-    // VALIDACIÓN DE TOKEN
-    // ============================================
 
     /**
      * Valida el token JWT actual
      *
      * Se debe llamar al iniciar la app para verificar si la sesión sigue activa
      */
-    fun validateToken() {
+    fun validateSession() {
         viewModelScope.launch {
-            // Verificar que hay token
-            if (UserPreferences.getAuthToken() == null) {
-                _tokenValidationState.postValue(NetworkResult.Success(false))
-                return@launch
-            }
+            _sessionState.value = UiState.Loading
 
-            authRepository.validateToken().collect { result ->
-                when (result) {
-                    is NetworkResult.Success -> {
-                        _tokenValidationState.postValue(NetworkResult.Success(result.data.valid))
-
-                        // Si el token es invalido, cerrar sesion
-                        if (!result.data.valid) {
-                            logout()
-                        }
-                    }
-
-                    is NetworkResult.Error -> {
-                        // Si hay error 401, cerrar sesion
-                        if (result.code == 401) {
-                            logout()
-                        }
-
-                        _tokenValidationState.postValue(NetworkResult.Error(result.message))
-                    }
-
-                    is NetworkResult.Loading -> {
-                        _tokenValidationState.postValue(NetworkResult.Loading())
-                    }
+            validateSessionUseCase()
+                .onSuccess { isValid ->
+                    _sessionState.value = UiState.Success(isValid)
+                    // Si el token no es válido, limpiar sesión actual
+                    if (!isValid) logoutUseCase()
                 }
-            }
+
+                .onFailure {
+                    // Error de red al validar - tratamos como sesión inválida
+                    _sessionState.value = UiState.Success(false)
+                    logoutUseCase()
+                }
         }
     }
-
-    // ============================================
-    // LOGOUT
-    // ============================================
 
     /**
      * Cierra la sesión del usuario actual
@@ -274,83 +177,28 @@ class AuthViewModel(
      * Limpia UserPreferences y SessionManager
      */
     fun logout() {
-        authRepository.logout()
-        SessionManager.logout()
-    }
-
-
-    // ============================================
-    // VALIDACIONES
-    // ============================================
-
-    /**
-     * Valida formato de email
-     *
-     * @param email Email a validar
-     * @return true si es válido
-     */
-
-    private fun isValidEmail(email: String): Boolean {
-        return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
-    }
-
-
-    /**
-     * Valida que la contraseña cumpla requisitos mínimos
-     *
-     * @param password Contraseña a validar
-     * @return true si es válida (mínimo 8 caracteres)
-     */
-    private fun isValidPassword(password: String): Boolean {
-        if (password.length < 8) return false
-        if(!password.any {it.isUpperCase()}) return false  //mayuscula
-        if(!password.any {it.isDigit()}) return false
-        return true
-    }
-
-    // ============================================
-    // UTILITY METHODS
-    // ============================================
-
-    /**
-     * Verifica si el usuario actual es guest
-     *
-     * @return true si es guest
-     */
-    fun isGuestUser(): Boolean {
-        return authRepository.isGuestUser()
+        logoutUseCase()
+        // Resetear todos los estados al cerrar sesión
+        resetStates()
     }
 
     /**
-     * Verifica si hay una sesión activa
-     *
-     * @return true si hay usuario logueado (guest o autenticado)
+     * Limpia el estado de login después de que el Fragment lo procesó.
+     * Evita que al rotar la pantalla se vuelva a navegar al home.
+     * Patrón "consume once" para evetos de navegación.
      */
-    fun isLoggedIn(): Boolean {
-        return authRepository.isLoggedIn()
+    fun onLoginHandled() {
+        _loginState.value = UiState.Idle
     }
 
-    /**
-     * Obtiene el ID del usuario actual
-     *
-     * @return ID del usuario o null
-     */
-    fun getCurrentUserId(): Int? {
-        return authRepository.getCurrentUserId()
+    fun onRegisterHandled() {
+        _registerState.value = UiState.Idle
     }
 
-
-    /**
-     * Limpia los resultados de operaciones
-     *
-     * Útil para limpiar mensajes después de mostrarlos
-     */
-    /*
-    fun clearOperationResults() {
-        _guestCreateState.value = null
-        _registerState.value = null
-        _loginState.value = null
-        _tokenValidationState.value = null
-        _cartMergeInfo.value = null
-    }*/
+    private fun resetStates() {
+        _loginState.value = UiState.Idle
+        _registerState.value = UiState.Idle
+        _guestState.value = UiState.Idle
+        _sessionState.value = UiState.Idle
+    }
 }
