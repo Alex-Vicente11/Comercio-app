@@ -1,6 +1,5 @@
 package com.oax.comercioapp.data.api
 
-import com.google.gson.annotations.SerializedName
 import com.oax.comercioapp.data.dto.AddToCartRequestDto
 import com.oax.comercioapp.data.dto.AuthResponseDto
 import com.oax.comercioapp.data.dto.CartCountResponseDto
@@ -18,7 +17,6 @@ import com.oax.comercioapp.data.dto.RemoveCartRequestDto
 import com.oax.comercioapp.data.dto.UpdateCartRequestDto
 import com.oax.comercioapp.data.dto.UpdateProfileRequestDto
 import com.oax.comercioapp.data.dto.ValidateTokenResponseDto
-import com.oax.comercioapp.data.models.*
 import retrofit2.Response
 import retrofit2.http.*
 
