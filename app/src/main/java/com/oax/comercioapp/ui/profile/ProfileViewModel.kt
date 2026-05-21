@@ -1,279 +1,125 @@
 package com.oax.comercioapp.ui.profile
 
-import android.util.Log
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.oax.comercioapp.data.api.NetworkResult
-import com.oax.comercioapp.data.local.UserPreferences
-import com.oax.comercioapp.data.models.User
-import com.oax.comercioapp.data.repository.AuthRepository
-import com.oax.comercioapp.data.repository.UserRepository
-import com.oax.comercioapp.utils.SessionManager
+import com.oax.comercioapp.domain.model.User
+import com.oax.comercioapp.domain.usecase.GetProfileUseCase
+import com.oax.comercioapp.domain.usecase.LogoutUseCase
+import com.oax.comercioapp.domain.usecase.UpdateProfileUseCase
+import com.oax.comercioapp.ui.UiState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * ProfileViewModel - ViewModel para gestión del perfil de usuario
+ * CAMBIOS RESPECTO AL ORIGINAL:
+ * 1. Eliminadas dependencias a SessionManager y UserPreferences directos.
+ *    El original llamaba UserPreferences.isGuest(), UserPreferences.getEmail(),
+ *    SessionManager.getCurrentUser(), etc. directamente desde el ViewModel.
+ *    Eso hacía al ViewModel dependiente de 2 singletons estáticos distintos
+ *    - imposible de testear y díficil de rastrear el flujo de datos.
  *
- * CAMBIOS vs versión anterior:
- * - Diferencia entre usuarios guest y autenticados
- * - Integración con AuthRepository para perfil
- * - Nuevos LiveData para estado de guest
- * - Métodos actualizados para JWT
+ *    Ahora: toda la información viene del use case -> repositorio -> preferencias
+ *    Un solo flujo de datos, trazable y testeable.
+ *
+ * 2. Eliminado loadUser(userId) que llamaba a userRepository.getUserById()
+ *    Con el nuevo enfoque de app cliente, no se consultan otros usuarios.
+ *    Solo el propio perfil via getProfile()
+ *
+ * 3. Eliminado el Log.d de debugging disperso por el ViewModel.
+ *    Los logs de sesión van en UserPreferences donde tienen contexto real.
+ *    Un ViewModel no debería loggear estado interno - eso es ruido en producción
+ *
+ * 4. updateProfile() agregado - estaba en AuthRepository original pero semánticamente
+ *    pertenece al perfil del usuario (IUserRepository).
+ *
+ * 5. isGuest se deriva del User cargado, no de una llamada separada a UserPreferences.
+ *    Si el usuario es guest, User.isGuest = true
+ *    Un solo estado, no dos fuentes de verdad distintos.
+ *
+ * SOBRE ProfilesViewModel (dashboard):
+ * El original listaba y creaba usuarios - funcionalidad admin.
+ * Con el nuevo enfoque se convierte en OrderHistoryViewModel
+ * mostrando los pedidos del usuario actual. Falta crear el endpoint en backend.
  */
 
 class ProfileViewModel(
-    private val userRepository: UserRepository = UserRepository(),
-    private val authRepository: AuthRepository = AuthRepository()
+    private val getProfileUseCase: GetProfileUseCase,
+    private val updateProfileUseCase: UpdateProfileUseCase,
+    private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
-    // Usuario cargado desde API
-    private val _user = MutableLiveData<NetworkResult<User>>()
-    val user: LiveData<NetworkResult<User>> = _user
+    private val _profileState = MutableStateFlow<UiState<User>>(UiState.Loading)
+    val profileState: StateFlow<UiState<User>> = _profileState.asStateFlow()
 
-    // Usuario actual desde SessionManager
-    val currentUser: LiveData<User?> = SessionManager.currentUser
+    private val _updateState = MutableStateFlow<UiState<User>>(UiState.Idle)
+    val updateState: StateFlow<UiState<User>> = _updateState.asStateFlow()
 
-    // Estado de sesion
-    val sessionStatus: LiveData<String> = SessionManager.sessionStatus
-
-    // Indica si el usuario es guest
-    private val _isGuest = MutableLiveData<Boolean>()
-    val isGuest: LiveData<Boolean> = _isGuest
-
-    // Email del usuario (null si es guest)
-    private val _userEmail = MutableLiveData<String?>()
-    val userEmail: LiveData<String?> = _userEmail
+    /**
+     * Estado de logout - Unit indica que el logout fue exitoso.
+     * El fragment observa esto para navegar al login
+     */
+    private val _logoutState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
+    val logoutState: StateFlow<UiState<Unit>> = _logoutState.asStateFlow()
 
     init {
-        // Cargar estado inicial
-        updateUserState()
+        loadProfile()
     }
 
-
-    // ============================================
-    // CARGAR INFORMACIÓN DE USUARIO
-    // ============================================
-
-    /**
-     * Carga información del usuario desde la API
-     *
-     * @param userId ID del usuario a cargar
-     */
-
-    fun loadUser(userId: Int) {
+    fun loadProfile() {
         viewModelScope.launch {
-            _user.postValue(NetworkResult.Loading())
-            userRepository.getUserById(userId).collect { result ->
-                when (result) {
-                    is NetworkResult.Success -> {
-                        _user.postValue(result)
-                    }
+            _profileState.value = UiState.Loading
 
-                    is NetworkResult.Error -> {
-                        if (result.code == 401) {
-                            SessionManager.logout()
-                        }
-                        _user.postValue(result)
-                    }
-
-                    is NetworkResult.Loading -> {
-                        _user.postValue(result)
-                    }
+            getProfileUseCase()
+                .onSuccess { user ->
+                    _profileState.value = UiState.Success(user)
                 }
-            }
+
+                .onFailure { error ->
+                    _profileState.value = UiState.Error(
+                        error.message ?: "Error al cargar perfil"
+                    )
+                }
         }
     }
-
-    /**
-     * Carga el perfil del usuario autenticado actual
-     *
-     * NUEVO: Usa AuthRepository con JWT
-     */
-    fun loadAuthenticatedProfile() {
-        viewModelScope.launch {
-            // Solo para usuarios autenticados
-            if (UserPreferences.isGuest()) {
-                _user.postValue(NetworkResult.Error("Usuario guest no tiene perfil"))
-                return@launch
-            }
-
-            authRepository.getProfile().collect { result ->
-                when (result) {
-                    is NetworkResult.Success -> {
-                        val userProfile = result.data.user
-                        if (userProfile != null) {
-                            val user = User(
-                                idUser = userProfile.idUser,
-                                userName = userProfile.userName,
-                                email = userProfile.email,
-                                isGuest = userProfile.isGuest,
-                                token = UserPreferences.getAuthToken()
-                            )
-                            _user.postValue(NetworkResult.Success(user))
-                        }
-                    }
-
-                    is NetworkResult.Error -> {
-                        if (result.code == 401) {
-                            SessionManager.logout()
-                        }
-
-                        _user.postValue(NetworkResult.Error(result.message))
-                    }
-
-                    is NetworkResult.Loading -> {
-                        _user.postValue(NetworkResult.Loading())
-                    }
-                }
-            }
-        }
-    }
-
-
-
-    // ============================================
-    // GESTIÓN DE SESIÓN
-    // ============================================
-
-    /**
-     * Establece el usuario actual en SessionManager
-     *
-     * @param user Usuario a establecer como actual
-     */
-    fun setCurrentUser(user: User) {
-
-        SessionManager.login(user)
-        Log.d("ProfileViewModel", "SessionManager.login() ejecutado")
-
-        updateUserState()
-
-        //Para guardar en SharedPreferences para persistir la sesion
-        //E iniciliciar datos especificos del usuario (carrito, preferencias, etc)
-    }
-
-
-    /**
-     * Obtiene el usuario actual
-     *
-     * @return Usuario actual o null si no hay sesión
-     */
-    fun getCurrentUser(): User? {
-        return SessionManager.getCurrentUser()
-    }
-
-
-    /**
-     * Verifica si hay usuario logueado
-     *
-     * @return true si hay sesión activa (guest o autenticado)
-     */
-    fun isUserLoggedIn(): Boolean = SessionManager.isLoggedIn()
-
 
     /**
      * Cierra la sesión del usuario actual
      */
     fun logout() {
-        Log.d("ProfileViewModel", "Ejecutando logout desde ViewModel")
-        SessionManager.logout()
-        authRepository.logout()
-        updateUserState()
-
-        // Para limpiar SharedPreferences
-        // Limpiar cache de datos del usuario
-        // Resetear otros estados relacionados
+        logoutUseCase()
+        _logoutState.value = UiState.Success(Unit)
     }
 
-    /**
-     * Refresca la información del usuario actual
-     */
-    fun refreshCurrentUser() {
-        SessionManager.getCurrentUser()?.let { user ->
-            if (user.isGuest) {
-                // Para guests, solo actualizar desde SessionManager
-                updateUserState()
-            } else {
-                // Para autenticados, cargar desde API
-                loadUser(user.idUser)
-            }
-        }
-    }
-
-
-    /**
-     * Obtiene información básica del usuario actual
-     *
-     * @return Pair con userId y userName, o null si no hay sesión
-     */
-    fun getCurrentUserInfo(): Pair<Int, String>? {
-        return SessionManager.getCurrentUser()?.let { user ->
-            Pair(user.idUser, user.userName)
-        }
-    }
-
-
-    // ============================================
-    // ACTUALIZAR ESTADO
-    // ============================================
 
     /**
      * Actualiza el estado del usuario (guest vs autenticado)
      */
-    private fun updateUserState() {
-        val isGuestUser = try {
-            UserPreferences.isGuest()
-        } catch (e: Exception) {
-            true
-        }
+    private fun updateProfile(newUserName: String) {
+        viewModelScope.launch {
+            _updateState.value = UiState.Loading
 
-        val email = try {
-            UserPreferences.getEmail()
-        } catch (e: Exception) {
-            null
-        }
+            updateProfileUseCase(newUserName)
+                .onSuccess { updatedUser ->
+                    _updateState.value = UiState.Success(updatedUser)
+                    // Refrescar el perfil para que la UI muestre el nombre actualizado
+                    _profileState.value = UiState.Success(updatedUser)
+                }
 
-        _isGuest.value = isGuestUser
-        _userEmail.value = email
-
-        Log.d("ProfileViewModel", "Estado actualizado: isGuest=$isGuestUser, email=$email")
-    }
-
-    // ============================================
-    // UTILITY METHODS
-    // ============================================
-
-    /**
-     * Obtiene información completa de la sesión (para debugging)
-     *
-     * @return String con información de sesión y preferencias
-     */
-    fun getSessionDebugInfo(): String {
-        return try {
-            buildString {
-                append("=== PROFILE VIEW MODEL DEBUG ===\n")
-                append("SessionManager Info:\n")
-                append(SessionManager.debugCurrentSession())
-                append("\n\n")
-                append("UserPreferences Info:\n")
-                append(UserPreferences.getSessionDebugInfo())
-            }
-        } catch (e: Exception) {
-            "Error obteniendo debug info: ${e.message}"
+                .onFailure { error ->
+                    _updateState.value = UiState.Error(
+                        error.message ?: "Error al actualizar perfil"
+                    )
+                }
         }
     }
 
-    /**
-     * Verifica si el token JWT está expirado
-     *
-     * @return true si está expirado o no existe
-     */
-    fun isTokenExpired(): Boolean {
-        return try {
-            UserPreferences.isTokenExpired()
-        } catch (e: Exception) {
-            true
-        }
+    fun onUpdateHandled() {
+        _updateState.value = UiState.Idle
+    }
+
+    fun onLogoutHandled() {
+        _logoutState.value = UiState.Idle
     }
 }
