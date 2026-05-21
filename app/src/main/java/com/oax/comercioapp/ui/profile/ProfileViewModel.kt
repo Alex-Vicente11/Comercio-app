@@ -96,7 +96,7 @@ class ProfileViewModel(
     /**
      * Actualiza el estado del usuario (guest vs autenticado)
      */
-    private fun updateProfile(newUserName: String) {
+    fun updateProfile(newUserName: String) {
         viewModelScope.launch {
             _updateState.value = UiState.Loading
 
