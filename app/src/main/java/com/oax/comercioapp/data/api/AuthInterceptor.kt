@@ -6,18 +6,26 @@ import okhttp3.Response
 import com.oax.comercioapp.data.local.UserPreferences
 
 /**
- * Interceptor para inyectar automáticamente el token JWT en todas las requests
+ * CAMBIO PRINCIPAL: UserPreferences ya no es 'object' estático.
+ * El interceptor original hacía:
+ *   UserPreference.getAuthToken()  <- llamada estática al singleton
  *
- * Funcionalidad:
- * - Lee el token desde UserPreferences
- * - Agrega header "Authorization: Bearer {token}" a todas las requests
- * - Solo agrega el header si el token existe
- * - Permite que endpoints sin auth funcionen normalmente
+ * Ahora UserPreferences es una clase que se inyecta.
+ * El interceptor recibe la instancia por constructor - el mismo patrón que los repositorios.
+ * Esto mantiene consistencia en toda la capa de datos.
  *
- * IMPORTANTE: Este interceptor requiere que UserPreferences esté inicializado
+ * ¿Cómo llega UserPreferences aquí si OkHttpClient se crea en RetrofitClient?
+ * Con Hilt, el módulo DI construye AuthInterceotor con la instancia de UserPreferences ya creada,
+ * y la pasa a OkHttpClient.Builder(). Así toda la cadena de dependencias queda resuelta por Hilt,
+ * sin singletons estáticos no llamadas init()
+ *
+ * Por ahora (sin Hilt), RetrofitClient necesita recibir el interceptor externamente
+ * o inicializarse después de que UserPreferences esté listo.
  */
 
-class AuthInterceptor: Interceptor {
+class AuthInterceptor(
+    private val userPreferences: UserPreferences
+): Interceptor {
     companion object {
         private const val TAG = "AuthInterceptor"
         private const val HEADER_AUTHORIZATION = "Authorization"
@@ -29,7 +37,7 @@ class AuthInterceptor: Interceptor {
 
         // Obtener token de UserPreferences
         val token = try {
-            UserPreferences.getAuthToken()
+            userPreferences.getAuthToken()
         } catch (e: Exception) {
             Log.e(TAG, "Error getting auth token: ${e.message}")
             null
@@ -42,14 +50,14 @@ class AuthInterceptor: Interceptor {
         }
 
         // Agregar token al header
-        val newRequest = originalRequest.newBuilder()
+        val authenticatedRequest = originalRequest.newBuilder()
             .addHeader(HEADER_AUTHORIZATION, "$TOKEN_PREFIX$token")
             .build()
 
         Log.d(TAG, "Added Authorization header to ${originalRequest.url}")
 
         // Proceder con request modificada
-        val response = chain.proceed(newRequest)
+        val response = chain.proceed(authenticatedRequest)
 
         // Log de respuesta (util para debugging)
         if (!response.isSuccessful) {
