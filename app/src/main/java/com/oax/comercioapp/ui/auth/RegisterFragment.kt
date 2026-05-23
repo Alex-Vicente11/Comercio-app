@@ -1,6 +1,5 @@
 package com.oax.comercioapp.ui.auth
 
-
 import android.os.Bundle
 import android.util.Patterns
 import android.view.LayoutInflater

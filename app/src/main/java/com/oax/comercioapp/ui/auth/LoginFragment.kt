@@ -1,8 +1,6 @@
 package com.oax.comercioapp.ui.auth
 
 import android.os.Bundle
-import android.util.Log
-import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
