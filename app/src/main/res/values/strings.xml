@@ -68,6 +68,8 @@
     <string name="error_passwords_dont_match">Las contraseñas no coinciden</string>
     <string name="error_empty_name">El nombre completo es requerido</string>
     <string name="error_terms_not_accepted">Debes aceptar los términos y condiciones</string>
+    <string name="error_name_too_short">El nombre debe tener al menos 3 caracteres</string>
+    <string name="error_empty_confirm_password">Debes confirmar tu contraseña</string>
 
     <!-- Login/Register Errors -->
     <string name="error_login_failed">Error al iniciar sesión. Verifica tus credenciales.</string>
