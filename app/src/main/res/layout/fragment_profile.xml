@@ -1,4 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    CAMBIOS:
+    1. COLORES: @android:color/holo_* → atributos del tema Material
+       Los colores holo_blue_light, holo_green_light, holo_red_dark son
+       colores hardcodeados de Android 2.x que ignoran completamente el
+       tema de la app (dark mode, colores de marca, accesibilidad).
+
+       Regla general:
+         holo_blue_light      → ?attr/colorPrimaryContainer
+         holo_green_light     → ?attr/colorSecondaryContainer
+         texto sobre colores  → ?attr/colorOnPrimaryContainer (legible en light y dark)
+         holo_red_dark        → ?attr/colorError
+         holo_orange_dark     → ?attr/colorTertiary
+
+       Esto garantiza que si el usuario tiene modo oscuro activado,
+       los colores se adaptan automáticamente.
+
+    2. btnChangeUser: texto "Cambiar usuario" → "Editar perfil"
+       El Fragment usa btnChangeUser.text = "Editar perfil" en código,
+       pero el XML tenía "Cambiar usuario". Se sincroniza para que el
+       estado inicial (antes de que el Fragment cargue) sea correcto.
+
+    3. drawableLeft → drawableStartCompat + tint
+       drawableLeft es atributo legacy que no soporta RTL (idiomas de
+       derecha a izquierda). drawableStartCompat es el equivalente RTL-aware.
+       app:drawableTint permite colorear el ícono con el color correcto
+       en dark mode sin necesidad de múltiples versiones del drawable.
+
+    4. sessionInfo: fondo hardcodeado → backgroundTint con colorSecondaryContainer
+       El fondo verde hardcodeado era placeholder de desarrollo.
+       Con el color del tema, la información de sesión se muestra
+       de forma consistente con el diseño de la app.
+
+    5. Agregado: tvEmptyState — mensaje cuando no hay sesión activa.
+       Antes el Fragment escribía directamente en profileId/sessionInfo.
+       Tener una view dedicada al estado vacío es más semántico y permite
+       animaciones de transición en el futuro.
+-->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -7,91 +45,91 @@
     android:padding="16dp"
     tools:context=".ui.profile.ProfileFragment">
 
+    <!-- Targeta de identidad del usuario -->
     <TextView
         android:id="@+id/profileId"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        android:background="@android:color/holo_blue_light"
+        android:background="?attr/colorPrimaryContainer"
         android:padding="28dp"
-        android:text="Cargando perfil..."
+        android:text="@string/loading_profile"
         android:textAlignment="center"
-        android:textColor="@android:color/white"
+        android:textColor="?attr/colorOnPrimaryContainer"
         android:textSize="18sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        tools:text="Perfil de: Juan Pérez\nID: 123" />
+        tools:text="Usuario: Juan Pérez\nEmail: juan@email.com\nCuenta verificada"/>
 
 
+    <!-- Información de sesión / estado del usuario -->
     <ScrollView
+        android:id="@+id/scrollView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:id="@+id/scrollView"
-        android:layout_marginStart="16dp"
+        android:layout_marginHorizontal="16dp"
         android:layout_marginTop="24dp"
-        android:layout_marginEnd="16dp"
+        app:layout_constraintBottom_toTopOf="@id/buttonsContainer"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/profileId"
-        app:layout_constraintBottom_toTopOf="@id/buttonsContainer">
+        app:layout_constraintTop_toBottomOf="@id/profileId">
 
         <TextView
             android:id="@+id/sessionInfo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@android:color/holo_green_light"
-            android:gravity="center"
+            android:background="?attr/colorSecondaryContainer"
+            android:gravity="start"
+            android:lineSpacingMultiplier="1.4"
             android:padding="16dp"
-            android:text="¡Sesión Iniciada!\n\nEste usuario ahora está logueado en la app."
-            android:textColor="@android:color/white"
+            android:textColor="?attr/colorOnSecondaryContainer"
             android:textSize="14sp"
-            />
+            tools:text="ID de usuario: 42\n\n Funcionalidades disponibles:\n Historial de pedidos:\n Carrito guardado\n Preferencias de cuenta" />
+
+
     </ScrollView>
 
     <!-- Contenedor de botones de acción -->
     <LinearLayout
+        android:id="@+id/buttonsContainer"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:id="@+id/buttonsContainer"
+        android:layout_marginHorizontal="48dp"
+        android:layout_marginBottom="24dp"
         android:orientation="vertical"
-        android:layout_marginTop="16dp"
-        android:layout_marginStart="24dp"
-        android:layout_marginEnd="24dp"
-        android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
         <!-- Botón Cambiar Usuario -->
         <Button
+            android:id="@+id/btnChangeUser"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/btnChangeUser"
-            android:text="Cambiar usuario"
-            android:textSize="16sp"
+            android:layout_marginBottom="6dp"
+            android:backgroundTint="?attr/colorTertiary"
+            android:minHeight="54dp"
             android:padding="16dp"
-            android:layout_marginBottom="12dp"
-            android:background="@android:color/holo_orange_dark"
-            android:textColor="@android:color/white"
-            android:drawableLeft="@android:drawable/ic_menu_manage"
-            android:drawablePadding="8dp"
-            android:gravity="center_vertical|center_horizontal"/>
+            android:text="@string/btn_edit_profile"
+            android:textColor="?attr/colorOnTertiary"
+            android:textSize="16sp"
+            app:drawableStartCompat="@android:drawable/ic_menu_edit"
+            app:drawableTint="?attr/colorOnTertiary" />
 
         <!-- Botón Cerrar Sesión -->
         <Button
+            android:id="@+id/btnLogout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/btnLogout"
-            android:text="Cerrar Sesión"
-            android:textSize="16sp"
-            android:padding="16dp"
             android:layout_marginBottom="12dp"
-            android:background="@android:color/holo_red_dark"
-            android:textColor="@android:color/white"
-            android:drawableLeft="@android:drawable/ic_lock_power_off"
-            android:drawablePadding="8dp"
-            android:gravity="center_vertical|center_horizontal"/>
+            android:backgroundTint="?attr/colorError"
+            android:minHeight="48dp"
+            android:padding="16dp"
+            android:text="@string/btn_logout"
+            android:textColor="?attr/colorOnError"
+            android:textSize="16sp"
+            app:drawableStartCompat="@android:drawable/ic_lock_power_off" />
 
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

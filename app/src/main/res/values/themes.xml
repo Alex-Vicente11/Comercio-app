@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
   <!-- Base application theme. -->
-  <style name="Theme.ComercioApp" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+  <style name="Theme.ComercioApp" parent="Theme.Material3.DayNight">
     <!-- Primary brand color. -->
     <item name="colorPrimary">@color/purple_500</item>
     <item name="colorPrimaryVariant">@color/purple_700</item>
@@ -14,5 +14,4 @@
     <!-- Customize your theme here. -->
   </style>
 
-  <style name="AppTheme" parent="Theme.Material3.DayNight"></style>
 </resources>

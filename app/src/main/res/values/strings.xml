@@ -86,4 +86,9 @@
     <!-- fragment_cart.xml -->
     <string name="error_loading_products">Error al cargar los productos. Intenta de nuevo.</string>
     <string name="fab_view_cart">Ver mi carrito</string>
+
+    <!-- fragment_profile.xml -->
+    <string name="loading_profile">Cargando perfil...</string>
+    <string name="btn_edit_profile">Editar perfil</string>
+    <string name="btn_logout">Cerrar sesión</string>
 </resources>
