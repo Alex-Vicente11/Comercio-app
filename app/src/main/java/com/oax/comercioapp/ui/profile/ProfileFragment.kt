@@ -1,7 +1,6 @@
 package com.oax.comercioapp.ui.profile
 
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,294 +8,249 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
-import com.oax.comercioapp.data.api.NetworkResult
-import com.oax.comercioapp.data.models.User
 import com.oax.comercioapp.databinding.FragmentProfileBinding
-import java.lang.NumberFormatException
 import com.oax.comercioapp.R
-import com.oax.comercioapp.data.models.CartItemDetailed
-import com.oax.comercioapp.ui.cart.CartViewModel
+import com.oax.comercioapp.domain.model.User
+import com.oax.comercioapp.ui.UiState
+import kotlinx.coroutines.launch
+
+/**
+ * CAMBIOS RESPECTO AL ORIGINAL:
+ * 1. ELIMINADAS  las 8 referencias a SessionManager
+ *    - SessionManager.currentUser.observe()
+ *    - SessionManager.isRestoring.observe()
+ *    - SessionManager.getCurrentUser()
+ *    - SessionManager.getCurrentUserName()
+ *    - SessionManager.logout() (x2)
+ *    - SessionManager.isLoggedInt()
+ *
+ *    Todoo eso se reemplaza con ProfileViewModel.profileState y ProfileViewModel.logoutState que
+ *    vienen de GetProfileUseCase. Un solo flujo de datos desde la fuente real (API/UserPreferences).
+ *
+ * 2. ELIMINADO: loadUserProfile() con profileId por argumentos
+ *    El original recibía un "profile_id" como argumento del Fragment para cargar otro usuario
+ *    por ID - patrón de pantalla admin. GetProfileUseCase obtiene el usuario del token JWT - no necesita ID.
+ *
+ * 3. ELIMINADO: CartViewModel inyectado en ProfileFragment
+ *    El original mostraba el carrito dentro de la pantalla de perfil.
+ *    Con el nuevo enfoque de app de pedidos:
+ *      - La pantalla de perfil muestra datos del usuario y opción de logout
+ *      - El carrito vive en CartFragment
+ *      - El historial de pedidos irá en OrderHistoryFragment
+ *   Un Fragment, una responsabilidad - SRP
+ *
+ * 4. SIMPLIFICADA: updateSessionButtons() sin SessionManager
+ *    La visibilidad de botones (logout, cambiar usuario) se decide basándose en el estado del
+ *    profileState - si hay un User cargado, hay sesión activa. Sin necesidad de consultar SessionManager
+ *
+ * 5. showChangeUserDialog() -> redirige al login
+ *    El original navegaba a "lista de usuarios" (pantalla admin).
+ *    Ahora cierra sesión y navega al LoginFragment - flujo correcto para una app de cliente.
+ *
+ * 6. ELIMINADO: formatCartItems() y updateCartInfo()
+ *    Eran helpers para mostrar el carrito dentro del perfil.
+ *    Ya no aplica con la separación de responsabilidades.
+ */
 
 class ProfileFragment : Fragment() {
 
-  companion object {
-    fun newInstance() = ProfileFragment()
-  }
+    private var _binding: FragmentProfileBinding? = null
+    private val binding get() = _binding!!
 
-  private var profileId: String? = null
-  private lateinit var binding: FragmentProfileBinding
+    private val viewModel: ProfileViewModel by viewModels()
 
-  private val viewModel: ProfileViewModel by viewModels()
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentProfileBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-  private val cartViewModel: CartViewModel by viewModels()
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    profileId = arguments?.getString("profile_id") ?: "NO HAY PROFILE ID"
+        setupObservers()
+        setupClickListeners()
+    }
 
-  }
+    private fun setupObservers() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
 
-  override fun onCreateView(
-    inflater: LayoutInflater, container: ViewGroup?,
-    savedInstanceState: Bundle?
-  ): View {
-    binding = FragmentProfileBinding.inflate(inflater, container, false)
-    return binding.root
-  }
+                // Estado del perfil
+                launch {
+                    viewModel.profileState.collect { state ->
+                        when (state) {
+                            is UiState.Loading -> {
+                                binding.profileId.text = "Cargando perfil..."
+                                setButtonsEnabled(false)
+                            }
 
-  override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-    super.onViewCreated(view, savedInstanceState)
+                            is UiState.Success -> {
+                                showUserProfile(state.data)
+                                setButtonsEnabled(true)
+                                updateButtonsVisibility(isLoggedIn = true, user = state.data)
+                            }
 
-    setupObservers()
-    setupClickListeners()
-    loadUserProfile()
-    updateSessionButtons()
-  }
+                            is UiState.Error -> {
+                                binding.profileId.text = state.message
+                                binding.sessionInfo.text = ""
+                                setButtonsEnabled(false)
+                                updateButtonsVisibility(isLoggedIn = false)
+                            }
 
-  private fun setupObservers() {
-    // Observer para la carga del usuario
-    viewModel.user.observe(viewLifecycleOwner) { result ->
-      when (result) {
-        is NetworkResult.Loading -> {
-          binding.profileId.text = "Cargando usuario..."
-          setButtonsEnabled(false)
+                            is UiState.Idle -> Unit
+                        }
+                    }
+                }
+
+                // Estado de actualización de perfil
+                launch {
+                    viewModel.updateState.collect { state ->
+                        when (state) {
+                            is UiState.Success -> {
+                                Toast.makeText(
+                                    context,
+                                    "Perfil actualizado",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                viewModel.onUpdateHandled()
+                            }
+
+                            is UiState.Error -> {
+                                Toast.makeText(
+                                    context,
+                                    state.message,
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                viewModel.onUpdateHandled()
+                            }
+
+                            else -> Unit
+                        }
+                    }
+                }
+
+                // Estado de logout
+                launch {
+                    viewModel.logoutState.collect { state ->
+                        if (state is UiState.Success) {
+                            viewModel.onLogoutHandled()
+                            navigateToLogin()
+                        }
+                    }
+                }
+            }
         }
-        is NetworkResult.Success -> {
-          Log.d("ProfileFragment", "Usuario cargado exitosamente: ${result.data}")
-          viewModel.setCurrentUser(result.data)
-          setButtonsEnabled(true)
+    }
+
+    private fun setupClickListeners() {
+        // boton cerrar sesion
+        binding.btnLogout.setOnClickListener { showLogoutDialog() }
+
+        /**
+         * btnChangeUser reutilizado para "Editar perfil".
+         * El original lo usaba para cambiar entre usuarios (pantalla admin).
+         *
+         * TODOo: Si se prefiere, puede abrirse un BottomSheetDialog con el campo de texto -
+         * más UX amigable que un AlertDialog simple.
+         */
+        // boton cambiar usuario
+        binding.btnChangeUser.setOnClickListener { showEditProfileDialog() }
+
+    }
+
+    private fun showUserProfile(user: User) {
+        binding.profileId.text = buildString {
+            append("Usuario: ${user.userName}\n")
+            if (!user.isGuest) append("Email: ${user.email ?: "-"}\n")
+            append(if (user.isGuest) "Modo: Invitado" else "Cuenta verificada")
         }
-        is NetworkResult.Error -> {
-          binding.profileId.text = "Error: ${result.message}\nID recibido: $profileId"
-          setButtonsEnabled(false)
+
+        binding.sessionInfo.text = buildString {
+            append("ID de usuario: ${user.id}\n\n")
+            if (user.isGuest) {
+                append("Estás en modo invitado.\n")
+                append("Regístrate para guardar tu historial de pedidos.")
+            } else {
+                append("Funcionalidades disponibles:\n")
+                append("* Historial de pedidos\n")
+                append("* Carrito guardado\n")
+                append("* Preferencias de cuenta")
+            }
         }
-      }
-    }
-    // Observer para el usuario actual en sesion
-    viewModel.currentUser.observe(viewLifecycleOwner) { user ->
-      updateUserUI(user)
-      updateSessionButtons()
     }
 
-    // Observer para el estado de restauracion de sesion
-    com.oax.comercioapp.utils.SessionManager.isRestoring.observe(viewLifecycleOwner) { isRestoring ->
-      if (isRestoring) {
-        binding.profileId.text = "Restaurando sesión..."
-        setButtonsEnabled(false)
-      }
+    private fun showLogoutDialog() {
+        val userName = (viewModel.profileState.value as? UiState.Success)?.data?.userName ?: "tu cuenta"
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Cerrar Sesión")
+            .setMessage("¿Cerrar la sesión de $userName?")
+            .setPositiveButton("Cerrar Sesión") { _, _ ->
+                viewModel.logout()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
-    cartViewModel.cartItems.observe(viewLifecycleOwner) { result ->
-      when (result) {
-        is NetworkResult.Loading -> {
-          updateCartInfo("Cargando carrito...")
-        }
-        is NetworkResult.Success -> {
-          val cartInfo = formatCartItems(result.data)
-          updateCartInfo(cartInfo)
-        }
-        is NetworkResult.Error -> {
-          updateCartInfo("Error al cargar carrito: ${result.message}")
-        }
-      }
-    }
-  }
-
-  private fun formatCartItems(cartItems: List<CartItemDetailed>): String { //carItems = result
-    if (cartItems.isEmpty()) {
-      return "Carrito vacío\n\nVe a 'Productos' para agregar productos a tu carrito"
-    }
-
-    val itemsText = cartItems.joinToString("\n") { item ->
-      ". ${item.product.product} - Cantidad: ${item.quantity} - $${String.format("%.2f", item.product.price * item.quantity)}"
-    }
-
-    val total = cartItems.sumOf { it.product.price * it.quantity }
-
-    return "Productos en carrito (${cartItems.size}):\n$itemsText\n\nTotal: $${String.format("%.2f", total)}"
-
-  }
-
-  private fun updateCartInfo(cartInfo: String) {
-    val currentUser = com.oax.comercioapp.utils.SessionManager.getCurrentUser()
-    currentUser?.let { user ->
-      binding.sessionInfo.text = "¡Sesión Activa!\n\n" +
-              "Usuario : ${user.userName}\n" +
-              "ID: ${user.idUser}\n\n" +
-              "$cartInfo\n\n" +
-              "Funcionalidades disponibles:\n" +
-              ". Carrito personalizado\n" +
-              ". Historial de pedidos\n" +
-              ". Preferencias guardadas"
-    }
-  }
-
-  private fun setupClickListeners() {
-    // boton cambiar usuario
-    binding.btnChangeUser.setOnClickListener {
-      showChangeUserDialog()
-    }
-    // boton cerrar sesion
-    binding.btnLogout.setOnClickListener {
-      showLogoutDialog()
-    }
-
-    // boton debug (util para desarrollo) pendiente
-  }
-
-  private fun showChangeUserDialog() {
-    AlertDialog.Builder(requireContext())
-      .setTitle("Cambiar Usuario")
-      .setMessage("¿Quieres volver a la lista de usuarios para seleccionar otro?")
-      .setPositiveButton("Sí") { _, _ ->
-        val currentUserName = com.oax.comercioapp.utils.SessionManager.getCurrentUserName()
-
-        // Hacer logout completo antes de navegar
-        com.oax.comercioapp.utils.SessionManager.logout()
-
-        // Navegar a la lista de usuarios
-        navigateToUsersList()
-
+    private fun showEditProfileDialog() {
+        // TODOO: implementar BottomSheetDialog o AlertDialog con EditText
+        // para actualizar el nombre de usuario via viewModel.updateProfile(newName)
         Toast.makeText(
-          requireContext(),
-          "Sesión cerrada para: $currentUserName. Selecciona otro usuario",
-          Toast.LENGTH_SHORT
+            context,
+            "Editar perfil - próximamente",
+            Toast.LENGTH_SHORT
         ).show()
-      }
-      .setNegativeButton("Cancelar", null)
-      .show()
-
-  }
-
-  private fun showLogoutDialog() {
-    val currentUser = com.oax.comercioapp.utils.SessionManager.getCurrentUser()
-    val userName = currentUser?.userName ?: "Usuario actual"
-
-    AlertDialog.Builder(requireContext())
-      .setTitle("Cerrar Sesión")
-      .setMessage("¿Estás seguro que quieres cerrar la sesión de $userName?\n\nEsto limpiará todos los datos de sesión guardados.")
-      .setPositiveButton("Cerrar Sesión") { _, _ ->
-          performLogout()
-      }
-      .setNegativeButton("Cancelar", null)
-      .show()
-  }
-
-  // PENDIENTE showSessionDebugInfo() {}
-
-  private fun performLogout() {
-    val userName = com.oax.comercioapp.utils.SessionManager.getCurrentUserName()
-
-    // Cerrar sesion
-    com.oax.comercioapp.utils.SessionManager.logout()
-
-    // Mostrar confirmacion
-    Toast.makeText(
-      requireContext(),
-      "Sesión cerrada para: $userName",
-      Toast.LENGTH_LONG
-    ).show()
-
-    // Navegar a la lista de usuarios
-    navigateToUsersList()
-  }
-
-  private fun navigateToUsersList() {
-    try {
-        findNavController().navigate(R.id.navigation_profiles)
-    } catch (e: Exception) {
-      // Si falla la navegacion, al menos mostrar el error
-      Toast.makeText(
-        requireContext(),
-        "Error al navegar: ${e.message}",
-        Toast.LENGTH_SHORT
-      ).show()
     }
-  }
 
-  private fun updateUserUI(user: User?) {
-    user?.let { currentUser ->
-      binding.profileId.text = "Perfil de:${currentUser.userName}\nID: ${currentUser.idUser}"
+    private fun updateButtonsVisibility(isLoggedIn: Boolean, user: User? = null) {
+        binding.btnLogout.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
+        // Mostrar "Editar perfil" solo para usuarios autenticados (no guests)
+        binding.btnChangeUser.visibility =
+            if (isLoggedIn && user?.isGuest == false) View.VISIBLE else View.GONE
 
-      Log.d("ProfileFragment", "Setting user session: ${currentUser.userName}")
-
-      // Cargar items del carrito
-      cartViewModel.loadCartItems()
-
-      binding.sessionInfo.text = buildSessionInfo(currentUser)
-
-      Toast.makeText(
-        requireContext(),
-        "¡Sesión iniciada para: ${currentUser.userName}",
-        Toast.LENGTH_LONG
-      ).show()
-    }?: run {
-      binding.profileId.text = "No hay sesión activa"
-      binding.sessionInfo.text = "No hay usuario logueado\n\n" +
-              "Selecciona un usuario de la lista para iniciar sesión"
-    }
-  }
-
-  private fun buildSessionInfo(user: User): String {
-    return "¡Sesión Activa!\n\n" +
-            "Usuario: ${user.userName}\n" +
-            "ID: ${user.idUser}\n\n" +
-            "Carrito de compras:\n" +
-            "Cargando productos..."  // se actualiza con Observer
-  }
-
-  private fun updateSessionButtons() {
-    val isLoggedIn = com.oax.comercioapp.utils.SessionManager.isLoggedIn()
-
-    // Mostrar/ocultar botones segun el estado de sesion
-    binding.btnChangeUser.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
-    binding.btnLogout.visibility = if (isLoggedIn) View.VISIBLE else View.GONE
-
-    // El boton de debug siempre visible para desarrollo PENDIENTE
-
-    // Actualizar texto del boton cambiar usuario
-    if (isLoggedIn) {
-      val userName = com.oax.comercioapp.utils.SessionManager.getCurrentUserName()
-      binding.btnChangeUser.text = "Cambiar Usuario ($userName)"
-    }
-  }
-
-  private fun setButtonsEnabled(enabled: Boolean) {
-    binding.btnChangeUser.isEnabled = enabled
-    binding.btnLogout.isEnabled = enabled
-  }
-
-  private fun loadUserProfile() {
-    profileId?.let { id ->
-      if (id != "No hay profile id") {
-        try {
-          val userId = id.toInt()
-          viewModel.loadUser(userId)
-        }catch (e: NumberFormatException) {
-          binding.profileId.text = "Error: ID de usuario inválido ($id)"
-          setButtonsEnabled(false)
+        if (isLoggedIn && user != null) {
+            binding.btnChangeUser.text = "Editar perfil"
         }
-      }else {
-        binding.profileId.text = "Error: No se recibió ID de usuario válido"
-        setButtonsEnabled(false)
-      }
     }
-  }
 
-  fun getCurrentUser() = viewModel.getCurrentUser()
+    private fun navigateToLogin() {
+        try {
+            findNavController().navigate(R.id.loginFragment)
+        } catch (e: Exception) {
+            // Si falla la navegacion, al menos mostrar el error
+            Toast.makeText(
+                context,
+                "Error de navegación: ${e.message}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
-  fun isUserLoggedIn() = viewModel.isUserLoggedIn()
+    private fun setButtonsEnabled(enabled: Boolean) {
+        binding.btnChangeUser.isEnabled = enabled
+        binding.btnLogout.isEnabled = enabled
+    }
 
-  override fun onResume() {
-    super.onResume()
-    // Actualizar UI cuando se regresa al fragment
-    updateSessionButtons()
-  }
+    override fun onResume() {
+        super.onResume()
+        // Si el estado es Idle (primera vez o después de logout), cargar perfil
+        if (viewModel.profileState.value is UiState.Idle ||
+            viewModel.profileState.value is UiState.Error) {
+            viewModel.loadProfile()
+        }
+    }
 
-  override fun onDestroy() {
-    super.onDestroy()
-    // No hacer binding null aquí porque puede causar problemas con los observers
-  }
-
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 }
