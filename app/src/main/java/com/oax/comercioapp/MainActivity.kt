@@ -9,13 +9,9 @@ import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
-import com.oax.comercioapp.data.api.NetworkResult
-import com.oax.comercioapp.data.local.UserPreferences
 import com.oax.comercioapp.databinding.ActivityMainBinding
 import com.oax.comercioapp.ui.UiState
 import com.oax.comercioapp.ui.auth.AuthViewModel
-import com.oax.comercioapp.utils.PreferencesManager
-import com.oax.comercioapp.utils.SessionManager
 import kotlinx.coroutines.launch
 
 /**
