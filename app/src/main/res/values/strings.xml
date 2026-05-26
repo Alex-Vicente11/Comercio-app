@@ -82,4 +82,8 @@
 
     <!-- Loading -->
     <string name="loading">Cargando…</string>
+
+    <!-- fragment_cart.xml -->
+    <string name="error_loading_products">Error al cargar los productos. Intenta de nuevo.</string>
+    <string name="fab_view_cart">Ver mi carrito</string>
 </resources>
